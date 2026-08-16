@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CÔNG AN XÃ THUẦN TRUNG - HỖ TRỢ THỦ TỤC HÀNH CHÍNH</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #eef3f7;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            color: #212529;
+        }
+
+        /* Top Bar Header */
+        .header-bar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 0;
+        }
+        .header-logo {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+        }
+        .header-title-main {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #0d2a4a;
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+        .header-title-sub {
+            font-size: 1.2rem;
+            color: #495057;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        /* Search Bar */
+        .search-box-container {
+            max-width: 650px;
+            margin: 10px auto 35px auto;
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 14px 50px 14px 25px;
+            border-radius: 50px;
+            border: 2px solid #b0c4de;
+            font-size: 1.15rem;
+            outline: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s;
+        }
+        .search-input:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 6px 16px rgba(13, 110, 253, 0.15);
+        }
+        .search-icon-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #007a87;
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        /* Procedure Cards */
+        .procedure-card {
+            background: #ffffff;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e2e8f0;
+        }
+        .procedure-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.12);
+        }
+        .card-img-container {
+            height: 220px;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .card-img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .card-banner-title {
+            background: #e76f51; /* Mặc định cam đỏ nhẹ */
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-top: auto;
+            text-transform: uppercase;
+        }
+        /* Phối màu theo từng thẻ */
+        .card-wrapper:nth-child(3n+1) .card-banner-title { background-color: #72b095; }
+        .card-wrapper:nth-child(3n+2) .card-banner-title { background-color: #e76f51; }
+        .card-wrapper:nth-child(3n+3) .card-banner-title { background-color: #1d3557; }
+
+        /* Video Container */
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        .video-container iframe {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+
+        /* Footer */
+        .footer-branding {
+            background: #ffffff;
+            padding: 20px 0;
+            margin-top: 60px;
+            border-top: 2px solid #e2e8f0;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container py-3" style="max-width: 1200px;">
+        
+        <!-- HEADER -->
+        <div class="header-bar">
+            <img src="logo.jpg" alt="Logo CAX" class="header-logo" onerror="this.src='https://via.placeholder.com/70?text=CAX'">
+            <div>
+                <h1 class="header-title-main">CÔNG AN XÃ THUẦN TRUNG</h1>
+                <p class="header-title-sub">Hỗ trợ thủ tục hành chính</p>
+            </div>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="search-box-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="Tìm kiếm thủ tục hành chính, dịch vụ công..." onkeyup="filterProcedures()">
+            <button class="search-icon-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </div>
+
+        <!-- DANH SÁCH THỦ TỤC CÓ ĐÁNH SỐ THỨ TỰ -->
+        <div class="row g-4" id="procedureCardsContainer">
+            <!-- Render thủ tục tại đây -->
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer-branding text-center">
+            <div class="fs-5 fw-bold text-warning-emphasis mb-2">
+                <i class="fa-solid fa-shield-halved me-2"></i>Phần mềm này được phát triển bởi Công an xã Thuần Trung
+            </div>
+            <div class="d-flex justify-content-between align-items-center px-4 mt-3">
+                <span class="text-muted small">Năm 2026 - Tuyên truyền Chuyển đổi số</span>
+                <button class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold" onclick="showAdminModal()">
+                    <i class="fa-solid fa-user-gear me-1"></i> Quản trị
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XEM VIDEO -->
+    <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="videoTitle">Xem Hướng Dẫn</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="closeVideo()"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="video-container">
+                        <iframe id="videoIframe" src="" frameborder="0" allowfullscreen></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ADMIN LOGIN / QUẢN TRỊ -->
+    <div class="modal fade" id="adminModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-shield me-2"></i>Bảng Quản Trị Hệ Thống</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    
+                    <!-- Form Đăng nhập (Nếu chưa login) -->
+                    <div id="adminLoginForm">
+                        <h4 class="fw-bold mb-3">Đăng nhập Admin</h4>
+                        <div class="mb-3">
+                            <label class="fw-bold">Tên đăng nhập</label>
+                            <input type="text" id="adminUser" class="form-control" value="admin">
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-bold">Mật khẩu</label>
+                            <input type="password" id="adminPass" class="form-control">
+                        </div>
+                        <button class="btn btn-primary w-100 fw-bold" onclick="loginAdmin()">Đăng nhập</button>
+                    </div>
+
+                    <!-- Panel Quản trị (Hiện khi đã login) -->
+                    <div id="adminPanel" style="display: none;">
+                        <ul class="nav nav-tabs mb-3" id="adminTab">
+                            <li class="nav-item">
+                                <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tabList">Danh Sách Thủ Tục</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tabPassword">Đổi Mật Khẩu</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- Tab Quản lý thủ tục -->
+                            <div class="tab-pane fade show active" id="tabList">
+                                <div class="card p-3 mb-4 bg-light border-0">
+                                    <h6 class="fw-bold text-primary" id="formProcedureTitle">Thêm / Sửa Thủ Tục Hành Chính</h6>
+                                    <input type="hidden" id="editId">
+                                    <div class="row g-2">
+                                        <div class="col-md-2">
+                                            <label class="small fw-bold">STT:</label>
+                                            <input type="number" id="editOrder" class="form-control" value="1">
+                                        </div>
+                                        <div class="col-md-10">
+                                            <label class="small fw-bold">Tên Lĩnh vực / Thủ tục:</label>
+                                            <input type="text" id="editTitle" class="form-control" placeholder="VD: 1. LĨNH VỰC QUẢN LÝ CƯ TRÚ">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Link Video (Google Drive / YouTube / FB):</label>
+                                            <input type="text" id="editVideoUrl" class="form-control" placeholder="Dán link Google Drive hoặc Youtube">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Link Hình đại diện / Icon:</label>
+                                            <input type="text" id="editImageUrl" class="form-control" placeholder="Link hình ảnh minh họa (ví dụ: https://...)">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Mô tả ngắn:</label>
+                                            <input type="text" id="editDesc" class="form-control" placeholder="Mô tả nội dung hướng dẫn">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-success fw-bold flex-grow-1" onclick="saveProcedure()">Lưu Thủ Tục</button>
+                                        <button class="btn btn-secondary fw-bold" onclick="resetForm()">Làm mới</button>
+                                    </div>
+                                </div>
+
+                                <div id="adminProceduresTable" class="list-group">
+                                    <!-- Render danh sách chỉnh sửa -->
+                                </div>
+                            </div>
+
+                            <!-- Tab Đổi mật khẩu -->
+                            <div class="tab-pane fade" id="tabPassword">
+                                <div class="p-3">
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Mật khẩu hiện tại</label>
+                                        <input type="password" id="oldPass" class="form-control">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Mật khẩu mới</label>
+                                        <input type="password" id="newPass" class="form-control">
+                                    </div>
+                                    <button class="btn btn-warning fw-bold w-100" onclick="changePassword()">Đổi Mật Khẩu</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let allProcedures = [];
+        let currentAdmin = null;
+
+        // Load dữ liệu khi trang khởi chạy
+        window.onload = loadProcedures;
+
+        async function loadProcedures() {
+            const res = await fetch('/api/procedures');
+            const data = await res.json();
+            if(data.success) {
+                allProcedures = data.data;
+                renderProcedures(allProcedures);
+            }
+        }
+
+        // Render giao diện chính có Đánh số thứ tự (1., 2., 3.,...)
+        function renderProcedures(list) {
+            const container = document.getElementById('procedureCardsContainer');
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                container.innerHTML = '<div class="text-center p-5 fs-4 text-muted">Chưa có thông tin thủ tục nào.</div>';
+                return;
+            }
+
+            list.forEach((item, index) => {
+                const col = document.createElement('div');
+                col.className = 'col-md-4 card-wrapper';
+                
+                // Chuẩn hóa tên có số thứ tự
+                const displayTitle = item.title.match(/^\d+\./) ? item.title : `${item.sort_order || index + 1}. ${item.title}`;
+                const defaultImg = 'https://via.placeholder.com/400x250?text=Thu+Tuc+Hanh+Chinh';
+
+                col.innerHTML = `
+                    <div class="procedure-card" onclick="watchVideo('${item.title}', '${item.video_url}')">
+                        <div class="card-img-container">
+                            <img src="${item.image_url || defaultImg}" onerror="this.src='${defaultImg}'" alt="${item.title}">
+                        </div>
+                        <div class="card-banner-title">
+                            ${displayTitle}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+        }
+
+        // Tìm kiếm linh hoạt
+        function filterProcedures() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allProcedures.filter(p => 
+                p.title.toLowerCase().includes(keyword) || 
+                (p.description && p.description.toLowerCase().includes(keyword))
+            );
+            renderProcedures(filtered);
+        }
+
+        // Xem video
+        function watchVideo(title, url) {
+            document.getElementById('videoTitle').innerText = title;
+            document.getElementById('videoIframe').src = url;
+            new bootstrap.Modal(document.getElementById('videoModal')).show();
+        }
+
+        function closeVideo() {
+            document.getElementById('videoIframe').src = '';
+        }
+
+        // Admin Management
+        function showAdminModal() {
+            new bootstrap.Modal(document.getElementById('adminModal')).show();
+        }
+
+        async function loginAdmin() {
+            const u = document.getElementById('adminUser').value;
+            const p = document.getElementById('adminPass').value;
+
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                currentAdmin = data.user;
+                document.getElementById('adminLoginForm').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+                loadAdminProceduresList();
+            } else {
+                alert(data.message);
+            }
+        }
+
+        function loadAdminProceduresList() {
+            const container = document.getElementById('adminProceduresTable');
+            container.innerHTML = '';
+
+            allProcedures.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-group-item d-flex justify-content-between align-items-center p-2';
+                div.innerHTML = `
+                    <div>
+                        <strong>STT ${item.sort_order || '-'}: ${item.title}</strong>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editProcedure(${item.id})">Sửa</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteProcedure(${item.id})">Xóa</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function editProcedure(id) {
+            const p = allProcedures.find(x => x.id === id);
+            if (!p) return;
+            document.getElementById('editId').value = p.id;
+            document.getElementById('editOrder').value = p.sort_order || 1;
+            document.getElementById('editTitle').value = p.title;
+            document.getElementById('editVideoUrl').value = p.video_url;
+            document.getElementById('editImageUrl').value = p.image_url || '';
+            document.getElementById('editDesc').value = p.description || '';
+            document.getElementById('formProcedureTitle').innerText = 'Chỉnh Sửa Thủ Tục';
+        }
+
+        function resetForm() {
+            document.getElementById('editId').value = '';
+            document.getElementById('editOrder').value = allProcedures.length + 1;
+            document.getElementById('editTitle').value = '';
+            document.getElementById('editVideoUrl').value = '';
+            document.getElementById('editImageUrl').value = '';
+            document.getElementById('editDesc').value = '';
+            document.getElementById('formProcedureTitle').innerText = 'Thêm Thủ Tục Hành Chính Mới';
+        }
+
+        async function saveProcedure() {
+            const body = {
+                id: document.getElementById('editId').value || null,
+                sort_order: document.getElementById('editOrder').value,
+                title: document.getElementById('editTitle').value,
+                video_url: document.getElementById('editVideoUrl').value,
+                image_url: document.getElementById('editImageUrl').value,
+                description: document.getElementById('editDesc').value
+            };
+
+            const res = await fetch('/api/admin/procedures', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) {
+                resetForm();
+                await loadProcedures();
+                loadAdminProceduresList();
+            }
+        }
+
+        async function deleteProcedure(id) {
+            if (!confirm('Bạn có chắc chắn muốn xóa thủ tục này?')) return;
+            const res = await fetch(`/api/admin/procedures/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) {
+                await loadProcedures();
+                loadAdminProceduresList();
+            }
+        }
+
+        async function changePassword() {
+            const oldPassword = document.getElementById('oldPass').value;
+            const newPassword = document.getElementById('newPass').value;
+
+            if (!oldPassword || !newPassword) {
+                alert('Vui lòng nhập đủ thông tin!');
+                return;
+            }
+
+            const res = await fetch('/api/admin/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentAdmin.username, oldPassword, newPassword })
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) {
+                document.getElementById('oldPass').value = '';
+                document.getElementById('newPass').value = '';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -4,189 +4,159 @@ const { createClient } = require('@libsql/client');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Cho phép nhận dữ liệu dung lượng lớn (dành cho ảnh Base64 tải từ máy)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static('public'));
 
 if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-  console.error('❌ LỖI NGHIÊM TRỌNG: Chưa cấu hình TURSO_DATABASE_URL hoặc TURSO_AUTH_TOKEN!');
-  process.exit(1);
+    console.error('❌ LỖI NGHIÊM TRỌNG: Chưa cấu hình TURSO_DATABASE_URL hoặc TURSO_AUTH_TOKEN');
+    process.exit(1);
 }
 
 const db = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN
 });
 
-// Hàm chuẩn hóa link video (Facebook, Google Drive, YouTube)
-function formatVideoEmbedUrl(url) {
-  if (!url) return '';
-  let cleanUrl = url.trim();
-
-  const iframeMatch = cleanUrl.match(/src=["']([^"']+)["']/);
-  if (iframeMatch) cleanUrl = iframeMatch[1];
-
-  if (cleanUrl.includes('facebook.com') || cleanUrl.includes('fb.watch')) {
-    if (cleanUrl.includes('facebook.com/plugins/video.php')) return cleanUrl;
-    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(cleanUrl)}&show_text=false&autoplay=false`;
-  }
-
-  if (cleanUrl.includes('drive.google.com')) {
-    const fileIdMatch = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (fileIdMatch && fileIdMatch[1]) {
-      return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
-    }
-  }
-
-  if (cleanUrl.includes('youtu.be/')) {
-    const videoId = cleanUrl.split('youtu.be/')[1]?.split('?')[0];
-    if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-  }
-
-  if (cleanUrl.includes('youtube.com/watch')) {
+// Tự động khởi tạo và nâng cấp cấu trúc Bảng dữ liệu
+async function initDb() {
     try {
-      const urlObj = new URL(cleanUrl);
-      const videoId = urlObj.searchParams.get('v');
-      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-    } catch (e) {
-      const match = cleanUrl.match(/v=([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) return `https://www.youtube.com/embed/${match[1]}`;
-    }
-  }
-
-  return cleanUrl;
-}
-
-// Khởi tạo Cơ sở dữ liệu
-async function initDB() {
-    try {
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password TEXT,
-                role TEXT,
-                name TEXT
-            )
-        `);
-
         await db.execute(`
             CREATE TABLE IF NOT EXISTS procedures (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sort_order INTEGER DEFAULT 1,
                 title TEXT NOT NULL,
-                category TEXT DEFAULT 'Thủ tục hành chính',
-                video_url TEXT NOT NULL,
+                video_url TEXT,
                 image_url TEXT,
                 description TEXT,
-                createdAt TEXT
+                sort_order INTEGER DEFAULT 0
             )
         `);
 
+        // Tự động bổ sung cột sort_order nếu cơ sở dữ liệu cũ chưa có
+        try {
+            await db.execute(`ALTER TABLE procedures ADD COLUMN sort_order INTEGER DEFAULT 0;`);
+        } catch (e) {
+            // Cột đã tồn tại, bỏ qua lỗi
+        }
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            )
+        `);
+
+        // Khởi tạo tài khoản admin mặc định nếu chưa có
         const adminCheck = await db.execute({
-            sql: `SELECT * FROM users WHERE username = 'admin'`,
-            args: []
+            sql: 'SELECT * FROM users WHERE username = ?',
+            args: ['admin']
         });
 
         if (adminCheck.rows.length === 0) {
             await db.execute({
-                sql: `INSERT INTO users VALUES ('admin', '123456', 'admin', 'Quản trị viên')`,
-                args: []
+                sql: 'INSERT INTO users (username, password) VALUES (?, ?)',
+                args: ['admin', 'admin123']
             });
-            
-            // Dữ liệu mẫu ban đầu
-            await db.execute({
-                sql: `INSERT INTO procedures (sort_order, title, category, video_url, image_url, description, createdAt) VALUES 
-                      (1, 'LĨNH VỰC QUẢN LÝ CƯ TRÚ', 'Cư trú', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://via.placeholder.com/300x200?text=Cu+Tru', 'Hướng dẫn đăng ký cư trú trực tuyến', ?),
-                      (2, 'LĨNH VỰC ĐĂNG KÝ XE', 'Đăng ký xe', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://via.placeholder.com/300x200?text=Dang+Ky+Xe', 'Hướng dẫn sang tên, cấp biển số xe', ?),
-                      (3, 'LĨNH VỰC CẤP HỘ CHIẾU', 'Hộ chiếu', 'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://via.placeholder.com/300x200?text=Ho+Chieu', 'Hướng dẫn làm hộ chiếu phổ thông', ?)`,
-                args: [new Date().toISOString(), new Date().toISOString(), new Date().toISOString()]
-            });
+            console.log('✅ Đã khởi tạo tài khoản Admin mặc định: admin / admin123');
         }
-        console.log('🚀 Khởi tạo và đồng bộ CSDL thành công!');
+        console.log('✅ Kết nối và cấu hình Cơ sở dữ liệu Turso thành công!');
     } catch (err) {
-        console.error('❌ Lỗi kết nối CSDL:', err.message);
-        process.exit(1);
+        console.error('❌ Lỗi khởi tạo cơ sở dữ liệu:', err);
     }
 }
-initDB();
+initDb();
 
-// API Đăng nhập
+// Hàm chuẩn hóa link video (Facebook, Google Drive, YouTube)
+function formatVideoEmbedUrl(url) {
+    if (!url) return '';
+    let cleanUrl = url.trim();
+
+    // Xử lý link Google Drive
+    if (cleanUrl.includes('drive.google.com')) {
+        const fileIdMatch = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || cleanUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (fileIdMatch && fileIdMatch[1]) {
+            return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+        }
+    }
+
+    // Xử lý link YouTube
+    if (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be')) {
+        let videoId = '';
+        if (cleanUrl.includes('youtu.be/')) {
+            videoId = cleanUrl.split('youtu.be/')[1].split('?')[0];
+        } else if (cleanUrl.includes('watch?v=')) {
+            videoId = cleanUrl.split('watch?v=')[1].split('&')[0];
+        }
+        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+    }
+
+    // Xử lý link Facebook Video
+    if (cleanUrl.includes('facebook.com')) {
+        return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(cleanUrl)}&show_text=0&autoplay=1`;
+    }
+
+    return cleanUrl;
+}
+
+// ---------------- API CLIENT ----------------
+
+// Lấy danh sách thủ tục hành chính
+app.get('/api/procedures', async (req, res) => {
+    try {
+        const result = await db.execute('SELECT * FROM procedures ORDER BY sort_order ASC, id ASC');
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Lỗi lấy danh sách thủ tục: ' + err.message });
+    }
+});
+
+// Đăng nhập Admin
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
         const result = await db.execute({
-            sql: `SELECT * FROM users WHERE username = ? AND password = ?`,
+            sql: 'SELECT id, username FROM users WHERE username = ? AND password = ?',
             args: [username, password]
         });
 
         if (result.rows.length > 0) {
-            const user = result.rows[0];
-            res.json({ success: true, user: { username: user.username, name: user.name, role: user.role } });
+            res.json({ success: true, user: result.rows[0] });
         } else {
             res.json({ success: false, message: 'Tên đăng nhập hoặc mật khẩu không chính xác!' });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Lỗi đăng nhập: ' + err.message });
     }
 });
 
-// API Đổi mật khẩu Admin
-app.post('/api/admin/change-password', async (req, res) => {
-    const { username, oldPassword, newPassword } = req.body;
-    try {
-        const check = await db.execute({
-            sql: `SELECT * FROM users WHERE username = ? AND password = ?`,
-            args: [username, oldPassword]
-        });
+// ---------------- API ADMIN ----------------
 
-        if (check.rows.length === 0) {
-            return res.json({ success: false, message: 'Mật khẩu cũ không đúng!' });
-        }
-
-        await db.execute({
-            sql: `UPDATE users SET password = ? WHERE username = ?`,
-            args: [newPassword, username]
-        });
-
-        res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// API Lấy danh sách thủ tục (Sắp xếp theo STT)
-app.get('/api/procedures', async (req, res) => {
-    try {
-        const result = await db.execute(`SELECT * FROM procedures ORDER BY sort_order ASC, id DESC`);
-        res.json({ success: true, data: result.rows });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// API Thêm / Sửa thủ tục
+// Thêm hoặc cập nhật thủ tục
 app.post('/api/admin/procedures', async (req, res) => {
-    const { id, sort_order, title, category, video_url, image_url, description } = req.body;
-    if (!title || !video_url) {
-        return res.json({ success: false, message: 'Vui lòng điền Tên thủ tục và Link Video!' });
+    const { id, title, video_url, image_url, description, sort_order } = req.body;
+
+    if (!title) {
+        return res.json({ success: false, message: 'Tên thủ tục không được để trống!' });
     }
 
-    const formattedUrl = formatVideoEmbedUrl(video_url);
-    const orderNum = parseInt(sort_order) || 1;
+    const formattedVideoUrl = formatVideoEmbedUrl(video_url);
+    const orderValue = parseInt(sort_order) || 0;
 
     try {
         if (id) {
-            // Cập nhật thủ tục cũ
+            // Cập nhật
             await db.execute({
-                sql: `UPDATE procedures SET sort_order = ?, title = ?, category = ?, video_url = ?, image_url = ?, description = ? WHERE id = ?`,
-                args: [orderNum, title, category || 'Thủ tục hành chính', formattedUrl, image_url || '', description || '', id]
+                sql: `UPDATE procedures SET title = ?, video_url = ?, image_url = ?, description = ?, sort_order = ? WHERE id = ?`,
+                args: [title, formattedVideoUrl, image_url || '', description || '', orderValue, id]
             });
             res.json({ success: true, message: 'Cập nhật thủ tục thành công!' });
         } else {
-            // Thêm thủ tục mới
+            // Thêm mới
             await db.execute({
-                sql: `INSERT INTO procedures (sort_order, title, category, video_url, image_url, description, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                args: [orderNum, title, category || 'Thủ tục hành chính', formattedUrl, image_url || '', description || '', new Date().toISOString()]
+                sql: `INSERT INTO procedures (title, video_url, image_url, description, sort_order) VALUES (?, ?, ?, ?, ?)`,
+                args: [title, formattedVideoUrl, image_url || '', description || '', orderValue]
             });
             res.json({ success: true, message: 'Thêm thủ tục mới thành công!' });
         }
@@ -195,17 +165,44 @@ app.post('/api/admin/procedures', async (req, res) => {
     }
 });
 
-// API Xóa thủ tục
+// Xóa thủ tục
 app.delete('/api/admin/procedures/:id', async (req, res) => {
+    const { id } = req.params;
     try {
         await db.execute({
-            sql: `DELETE FROM procedures WHERE id = ?`,
-            args: [req.params.id]
+            sql: 'DELETE FROM procedures WHERE id = ?',
+            args: [id]
         });
         res.json({ success: true, message: 'Đã xóa thủ tục thành công!' });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi khi xóa thủ tục!' });
+        res.status(500).json({ success: false, message: 'Lỗi xóa thủ tục: ' + err.message });
     }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Đổi mật khẩu Admin
+app.post('/api/admin/change-password', async (req, res) => {
+    const { username, oldPassword, newPassword } = req.body;
+    try {
+        const check = await db.execute({
+            sql: 'SELECT * FROM users WHERE username = ? AND password = ?',
+            args: [username, oldPassword]
+        });
+
+        if (check.rows.length === 0) {
+            return res.json({ success: false, message: 'Mật khẩu hiện tại không đúng!' });
+        }
+
+        await db.execute({
+            sql: 'UPDATE users SET password = ? WHERE username = ?',
+            args: [newPassword, username]
+        });
+
+        res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Lỗi đổi mật khẩu: ' + err.message });
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Server đang chạy tại port ${PORT}`);
+});

@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">CÔNG AN XÃ THUẦN TRUNG - HỖ TRỢ THỦ TỤC HÀNH CHÍNH</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --card-border-radius: 16px;
+            --main-bg-color: #f0f4f8;
+            --main-bg-image: url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1920&q=80');
+        }
+
+        body {
+            background: var(--main-bg-color) var(--main-bg-image) no-repeat center center fixed;
+            background-size: cover;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #1a202c;
+            min-height: 100vh;
+        }
+
+        .page-overlay {
+            background: rgba(240, 244, 248, 0.75);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            min-height: 100vh;
+            padding-bottom: 30px;
+        }
+
+        .sidebar-nav {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: var(--card-border-radius);
+            padding: 20px 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            height: fit-content;
+        }
+        .nav-link-custom {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: #4a5568;
+            font-weight: 600;
+            border-radius: 12px;
+            text-decoration: none;
+            margin-bottom: 6px;
+            transition: all 0.2s ease;
+        }
+        .nav-link-custom:hover {
+            background-color: #edf2f7;
+            color: #2b6cb0;
+        }
+        .nav-link-custom.active {
+            background-color: #2b6cb0;
+            color: #ffffff;
+        }
+
+        .header-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 10px 0 20px 0;
+            justify-content: center;
+        }
+        .header-logo {
+            width: 68px;
+            height: 68px;
+            object-fit: contain;
+        }
+        .header-title-main {
+            font-size: 1.85rem;
+            font-weight: 900;
+            color: #0f2942;
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+        .header-title-sub {
+            font-size: 1.15rem;
+            color: #4a5568;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .search-box-container {
+            max-width: 580px;
+            margin: 0 auto 30px auto;
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px 50px 12px 24px;
+            border-radius: 50px;
+            border: 2px solid #cbd5e0;
+            font-size: 1.05rem;
+            outline: none;
+            background: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+        .search-input:focus {
+            border-color: #319795;
+            box-shadow: 0 0 0 3px rgba(49, 151, 149, 0.2);
+        }
+        .search-icon-btn {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #007a87;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .category-card {
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            transition: transform 0.25s, box-shadow 0.25s;
+            cursor: pointer;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+        }
+
+        .category-header-title {
+            padding: 16px 10px 12px 10px;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #1a202c;
+            text-transform: uppercase;
+            line-height: 1.3;
+        }
+
+        .category-illustration {
+            height: 170px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+        .category-illustration svg {
+            max-height: 100%;
+            width: auto;
+        }
+
+        .category-body {
+            padding: 15px 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            justify-content: space-between;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+        }
+        .feature-list li {
+            font-size: 0.98rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+            position: relative;
+            padding-left: 20px;
+        }
+        .feature-list li::before {
+            content: "•";
+            position: absolute;
+            left: 4px;
+            color: #1a202c;
+            font-weight: bold;
+            font-size: 1.2rem;
+            line-height: 1;
+            top: -1px;
+        }
+
+        .btn-action-custom {
+            background-color: #1d61ac;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 800;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            width: 80%;
+            margin: 0 auto;
+            box-shadow: 0 4px 10px rgba(29, 97, 172, 0.3);
+            transition: all 0.2s ease;
+        }
+        .btn-action-custom:hover {
+            background-color: #154c8a;
+            color: #ffffff;
+            transform: scale(1.02);
+        }
+
+        .cat-curu { background-color: #c8e6c9; }
+        .cat-curu .category-header-title { color: #0d3b2e; }
+
+        .cat-xe { background-color: #ffccbc; }
+        .cat-xe .category-header-title { color: #3e2723; }
+
+        .cat-hochieu { background-color: #bbdefb; }
+        .cat-hochieu .category-header-title { color: #0d47a1; }
+
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+            background: #000;
+            border-radius: 8px 8px 0 0;
+        }
+        .video-container iframe {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+
+        .footer-branding {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 16px 24px;
+            margin-top: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .password-wrap { position: relative; }
+        .password-wrap .form-control { padding-right: 46px; }
+        .password-toggle {
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            border: 0; background: transparent; color: #6c757d; padding: 6px 8px; z-index: 3;
+        }
+        .category-card.dynamic-card { min-height: 360px; background-size: cover; background-position: center; position: relative; }
+        .category-card.dynamic-card.has-bg::before {
+            content: ''; position: absolute; inset: 0; background: rgba(255,255,255,.78); pointer-events: none;
+        }
+        .category-card.dynamic-card > * { position: relative; z-index: 1; }
+        .category-illustration-placeholder {
+            height: 170px; display: flex; align-items: center; justify-content: center; font-size: 4.5rem; color: rgba(0,0,0,.42);
+        }
+        .category-bg-thumb { width: 72px; height: 52px; object-fit: cover; border-radius: 8px; border: 1px solid #dee2e6; }
+    </style>
+</head>
+<body>
+
+    <div class="page-overlay">
+        <div class="container-fluid py-3 px-md-4" style="max-width: 1400px;">
+            <div class="row g-4">
+                
+                <!-- SIDEBAR NAV -->
+                <div class="col-lg-2 col-md-3 d-none d-md-block">
+                    <div class="sidebar-nav">
+                        <a href="#" class="nav-link-custom active">
+                            <i class="fa-solid fa-house"></i>
+                            <span>Trang chủ</span>
+                        </a>
+                        <a href="#" class="nav-link-custom">
+                            <i class="fa-solid fa-user"></i>
+                            <span>Hồ sơ của tôi</span>
+                        </a>
+                        <a href="#" class="nav-link-custom">
+                            <i class="fa-solid fa-chart-column"></i>
+                            <span>Thống kê</span>
+                        </a>
+                        <a href="#" class="nav-link-custom">
+                            <i class="fa-circle-info fa-solid"></i>
+                            <span>Hướng dẫn</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- MAIN CONTENT AREA -->
+                <div class="col-lg-10 col-md-9 col-12">
+                    
+                    <!-- HEADER -->
+                    <div class="header-bar">
+                        <img id="uiLogo" src="logo.jpg" alt="Logo CAX" class="header-logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/C%C3%B4ng_an_Nh%C3%A2n_d%C3%A2n_Vi%E1%BB%87t_Nam.png/220px-C%C3%B4ng_an_Nh%C3%A2n_d%C3%A2n_Vi%E1%BB%87t_Nam.png'">
+                        <div>
+                            <h1 class="header-title-main" id="uiTitleMain">CÔNG AN XÃ THUẦN TRUNG</h1>
+                            <p class="header-title-sub" id="uiTitleSub">Hỗ trợ thủ tục hành chính</p>
+                        </div>
+                    </div>
+
+                    <!-- SEARCH BAR -->
+                    <div class="search-box-container">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Tìm kiếm thủ tục hành chính..." onkeyup="filterProcedures()" autocomplete="off">
+                        <button class="search-icon-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+                    </div>
+
+                    <!-- DANH SÁCH LĨNH VỰC -->
+                    <div class="row g-4" id="categoryCardsContainer">
+                        <div class="col-12 text-center text-muted py-4">Đang tải các lĩnh vực...</div>
+                    </div>
+
+                    <!-- FOOTER BRANDING -->
+                    <div class="footer-branding">
+                        <div class="text-center fs-5 fw-bold text-dark mb-2">
+                            <i class="fa-solid fa-shield-halved me-2 text-warning"></i><span id="uiFooterBrand">Phần mềm này được phát triển bởi Công an xã Thuần Trung</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center px-2 mt-3">
+                            <span class="text-muted fw-semibold small">Năm 2026 - Code by Ánh Hào</span>
+                            <button class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold" onclick="showAdminModal()">
+                                <i class="fa-solid fa-user-gear me-1"></i> Quản trị
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HIỂN THỊ DANH SÁCH THỦ TỤC THEO LĨNH VỰC -->
+    <div class="modal fade" id="categoryListModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="categoryModalTitle">Danh Sách Thủ Tục</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div id="modalProceduresList" class="list-group"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XEM VIDEO & LỖI PHÁT SINH / TÀI LIỆU -->
+    <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="videoTitle">Xem Hướng Dẫn</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="closeVideo()"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="video-container">
+                        <iframe id="videoIframe" src="" frameborder="0" allowfullscreen></iframe>
+                    </div>
+                    
+                    <!-- PHẦN LỖI PHÁT SINH & TÀI LIỆU MINH HỌA -->
+                    <div class="p-4 bg-light">
+                        <div id="commonErrorsSection" class="mb-4" style="display: none;">
+                            <h5 class="fw-bold text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Các Lỗi Thường Gặp & Cách Khắc Phục</h5>
+                            <div class="card card-body bg-white border-warning text-dark shadow-sm" id="commonErrorsText" style="white-space: pre-line;"></div>
+                        </div>
+
+                        <div id="documentSection" style="display: none;">
+                            <h5 class="fw-bold text-primary"><i class="fa-solid fa-file-lines me-2"></i>Tài Liệu Hướng Dẫn & Minh Họa</h5>
+                            <div class="d-flex align-items-center gap-3 mt-2">
+                                <a id="docDownloadBtn" href="#" target="_blank" class="btn btn-outline-primary fw-bold">
+                                    <i class="fa-solid fa-download me-2"></i>Tải Về Tài Liệu (Word / PDF)
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL QUẢN TRỊ -->
+    <div class="modal fade" id="adminModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-shield me-2"></i>Bảng Quản Trị Hệ Thống</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    
+                    <!-- Form Đăng nhập -->
+                    <div id="adminLoginForm">
+                        <h4 class="fw-bold mb-3">Đăng nhập Admin</h4>
+                        <div class="mb-3">
+                            <label class="fw-bold">Tên đăng nhập</label>
+                            <input type="text" id="adminUser" class="form-control" value="admin" autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-bold">Mật khẩu</label>
+                            <div class="password-wrap">
+                                <input type="password" id="adminPass" class="form-control" autocomplete="new-password">
+                                <button type="button" class="password-toggle" onclick="togglePassword('adminPass', this)" aria-label="Ẩn/hiện mật khẩu"><i class="fa-solid fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary w-100 fw-bold" onclick="loginAdmin()">Đăng nhập</button>
+                    </div>
+
+                    <!-- Panel Quản trị -->
+                    <div id="adminPanel" style="display: none;">
+                        <ul class="nav nav-tabs mb-3">
+                            <li class="nav-item">
+                                <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tabList">Danh Sách Thủ Tục</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tabCategories">Lĩnh Vực</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tabTheme">Sửa Giao Diện</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tabPassword">Đổi Mật Khẩu</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- Tab Quản lý thủ tục -->
+                            <div class="tab-pane fade show active" id="tabList">
+                                <div class="card p-3 mb-4 bg-light border-0">
+                                    <h6 class="fw-bold text-primary" id="formProcedureTitle">Thêm Thủ Tục Hành Chính Mới</h6>
+                                    <input type="hidden" id="editId">
+                                    <div class="row g-2">
+                                        <div class="col-md-3">
+                                            <label class="small fw-bold">STT Ưu tiên:</label>
+                                            <input type="number" id="editOrder" class="form-control" value="1">
+                                        </div>
+                                        <div class="col-md-9">
+                                            <label class="small fw-bold">Chọn Lĩnh Vực Thuộc Về:</label>
+                                            <select id="editCategory" class="form-select fw-bold text-primary"></select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Tên Thủ tục / Hướng dẫn:</label>
+                                            <input type="text" id="editTitle" class="form-control" placeholder="VD: Hướng dẫn đăng ký tạm trú qua VNeID">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Link Video (Google Drive / YouTube / FB):</label>
+                                            <input type="text" id="editVideoUrl" class="form-control" placeholder="Dán link Google Drive hoặc Youtube">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold text-primary"><i class="fa-solid fa-upload me-1"></i>Tải file Word / PDF / Link Minh Họa:</label>
+                                            <input type="file" id="editDocFile" class="form-control mb-1" accept=".doc,.docx,.pdf" onchange="handleDocUpload(event)">
+                                            <input type="text" id="editDocUrl" class="form-control" placeholder="Hoặc dán Link file Word/PDF (Google Drive / Cloud)...">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Các lỗi phát sinh thường gặp & cách khắc phục:</label>
+                                            <textarea id="editCommonErrors" class="form-control" rows="3" placeholder="Nhập các lỗi hay gặp khi làm thủ tục này..."></textarea>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold text-primary"><i class="fa-solid fa-upload me-1"></i>Tải ảnh minh họa từ máy tính:</label>
+                                            <input type="file" id="editImageFile" class="form-control" accept="image/*" onchange="handleImageUpload(event)">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Hoặc Link Ảnh đại diện (URL):</label>
+                                            <input type="text" id="editImageUrl" class="form-control" placeholder="Link ảnh minh họa..." oninput="updateImagePreview(this.value)">
+                                        </div>
+                                        <div class="col-12 text-center my-2" id="previewContainer" style="display: none;">
+                                            <span class="small fw-bold text-muted d-block mb-1">Ảnh xem trước:</span>
+                                            <img id="imagePreview" src="" style="max-height: 100px; border-radius: 8px; border: 1px solid #ccc; padding: 2px;">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Mô tả ngắn:</label>
+                                            <input type="text" id="editDesc" class="form-control" placeholder="Mô tả nội dung ngắn gọn">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-success fw-bold flex-grow-1" onclick="saveProcedure()">Lưu Thủ Tục</button>
+                                        <button class="btn btn-secondary fw-bold" onclick="resetForm()">Làm mới</button>
+                                    </div>
+                                </div>
+
+                                <div id="adminProceduresTable" class="list-group"></div>
+                            </div>
+
+                            <!-- Tab Quản lý lĩnh vực -->
+                            <div class="tab-pane fade" id="tabCategories">
+                                <div class="card p-3 mb-3 bg-light border-0">
+                                    <h6 class="fw-bold text-primary" id="categoryFormTitle">Thêm Lĩnh Vực Mới</h6>
+                                    <input type="hidden" id="editCategoryId">
+                                    <div class="row g-2">
+                                        <div class="col-md-3">
+                                            <label class="small fw-bold">STT:</label>
+                                            <input type="number" id="categoryOrder" class="form-control" value="1">
+                                        </div>
+                                        <div class="col-md-9">
+                                            <label class="small fw-bold">Tên lĩnh vực:</label>
+                                            <input type="text" id="categoryName" class="form-control" placeholder="VD: 4. LĨNH VỰC ...">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small fw-bold">Màu nền:</label>
+                                            <input type="color" id="categoryBgColor" class="form-control form-control-color w-100" value="#ffffff">
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label class="small fw-bold">Ảnh nền (URL):</label>
+                                            <input type="text" id="categoryBgImage" class="form-control" placeholder="Dán URL hoặc tải ảnh bên dưới" oninput="updateCategoryBgPreview(this.value)">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold text-primary"><i class="fa-solid fa-upload me-1"></i>Tải ảnh nền từ máy:</label>
+                                            <input type="file" id="categoryBgFile" class="form-control" accept="image/*" onchange="handleCategoryBgUpload(event)">
+                                        </div>
+                                        <div class="col-12 text-center" id="categoryBgPreviewWrap" style="display:none;">
+                                            <img id="categoryBgPreview" src="" style="max-height:120px;max-width:100%;border-radius:8px;border:1px solid #ccc;">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="small fw-bold">Mô tả ngắn:</label>
+                                            <textarea id="categoryDescription" class="form-control" rows="2" placeholder="VD: Đăng ký thường trú, tạm trú; xác nhận nơi cư trú,..."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-success fw-bold flex-grow-1" onclick="saveCategory()">Lưu Lĩnh Vực</button>
+                                        <button class="btn btn-secondary fw-bold" onclick="resetCategoryForm()">Làm mới</button>
+                                    </div>
+                                </div>
+                                <div id="adminCategoriesTable" class="list-group"></div>
+                            </div>
+
+                            <!-- Tab Sửa Giao diện -->
+                            <div class="tab-pane fade" id="tabTheme">
+                                <div class="p-3">
+                                    <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-palette me-2"></i>Tùy Chỉnh Giao Diện Phần Mềm</h6>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Màu nền chính (Background Color):</label>
+                                        <input type="color" id="themeBgColor" class="form-control form-control-color w-100" value="#f0f4f8">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Link Ảnh nền (Background Image URL):</label>
+                                        <input type="text" id="themeBgImage" class="form-control" placeholder="Dán URL ảnh nền...">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Link Logo Đơn vị (URL):</label>
+                                        <input type="text" id="themeLogo" class="form-control" placeholder="Dán URL Logo...">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Tiêu đề chính:</label>
+                                        <input type="text" id="themeTitleMain" class="form-control" placeholder="CÔNG AN XÃ THUẦN TRUNG">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Tiêu đề phụ:</label>
+                                        <input type="text" id="themeTitleSub" class="form-control" placeholder="Hỗ trợ thủ tục hành chính">
+                                    </div>
+                                    <button class="btn btn-primary fw-bold w-100" onclick="saveThemeSettings()">Lưu Giao Diện</button>
+                                </div>
+                            </div>
+
+                            <!-- Tab Đổi mật khẩu -->
+                            <div class="tab-pane fade" id="tabPassword">
+                                <div class="p-3">
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Mật khẩu hiện tại</label>
+                                        <div class="password-wrap"><input type="password" id="oldPass" class="form-control"><button type="button" class="password-toggle" onclick="togglePassword('oldPass', this)" aria-label="Ẩn/hiện mật khẩu"><i class="fa-solid fa-eye"></i></button></div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Mật khẩu mới</label>
+                                        <div class="password-wrap"><input type="password" id="newPass" class="form-control"><button type="button" class="password-toggle" onclick="togglePassword('newPass', this)" aria-label="Ẩn/hiện mật khẩu"><i class="fa-solid fa-eye"></i></button></div>
+                                    </div>
+                                    <button class="btn btn-warning fw-bold w-100" onclick="changePassword()">Đổi Mật Khẩu</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let allProcedures = [];
+        let allCategories = [];
+        let currentAdmin = null;
+
+        window.onload = function() {
+            document.getElementById('searchInput').value = '';
+            loadSettings();
+            loadCategories();
+            loadProcedures();
+        };
+
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                if (data.success) {
+                    const s = data.data;
+                    if (s.bg_color) document.documentElement.style.setProperty('--main-bg-color', s.bg_color);
+                    if (s.bg_image) document.documentElement.style.setProperty('--main-bg-image', `url('${s.bg_image}')`);
+                    if (s.site_logo) document.getElementById('uiLogo').src = s.site_logo;
+                    if (s.title_main) {
+                        document.getElementById('uiTitleMain').innerText = s.title_main;
+                        document.getElementById('uiFooterBrand').innerText = `Phần mềm này được phát triển bởi ${s.title_main}`;
+                    }
+                    if (s.title_sub) document.getElementById('uiTitleSub').innerText = s.title_sub;
+
+                    // Fill data to admin tab
+                    document.getElementById('themeBgColor').value = s.bg_color || '#f0f4f8';
+                    document.getElementById('themeBgImage').value = s.bg_image || '';
+                    document.getElementById('themeLogo').value = s.site_logo || '';
+                    document.getElementById('themeTitleMain').value = s.title_main || '';
+                    document.getElementById('themeTitleSub').value = s.title_sub || '';
+                }
+            } catch (e) {
+                console.log("Error loading settings");
+            }
+        }
+
+        async function saveThemeSettings() {
+            const body = {
+                bg_color: document.getElementById('themeBgColor').value,
+                bg_image: document.getElementById('themeBgImage').value,
+                site_logo: document.getElementById('themeLogo').value,
+                title_main: document.getElementById('themeTitleMain').value,
+                title_sub: document.getElementById('themeTitleSub').value
+            };
+
+            const res = await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) {
+                loadSettings();
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+        }
+
+        function togglePassword(inputId, button) {
+            const input = document.getElementById(inputId);
+            const icon = button.querySelector('i');
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            icon.className = showing ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+        }
+
+        async function loadCategories() {
+            try {
+                const res = await fetch('/api/categories');
+                const data = await res.json();
+                if (data.success) {
+                    allCategories = data.data;
+                    renderCategoryCards();
+                    fillProcedureCategorySelect();
+                    loadAdminCategoriesList();
+                }
+            } catch (e) {
+                console.log('Lỗi tải lĩnh vực', e);
+            }
+        }
+
+        function renderCategoryCards() {
+            const container = document.getElementById('categoryCardsContainer');
+            container.innerHTML = '';
+            if (!allCategories.length) {
+                container.innerHTML = '<div class="col-12 text-center text-muted py-4">Chưa có lĩnh vực nào.</div>';
+                return;
+            }
+
+            allCategories.forEach((cat, index) => {
+                const col = document.createElement('div');
+                col.className = 'col-xl-4 col-md-6';
+                const card = document.createElement('div');
+                card.className = 'category-card dynamic-card' + (cat.background_image ? ' has-bg' : '');
+                card.style.backgroundColor = cat.background_color || '#ffffff';
+                if (cat.background_image) card.style.backgroundImage = `url("${String(cat.background_image).replace(/"/g, '&quot;')}")`;
+                card.onclick = () => openCategoryModal(cat.name);
+
+                const icon = ['fa-house-user','fa-motorcycle','fa-passport','fa-folder-open','fa-file-shield'][index % 5];
+                const descItems = String(cat.description || '').split(/[;\n]+/).map(x => x.trim()).filter(Boolean).slice(0, 3);
+                card.innerHTML = `
+                    <div class="category-header-title">${escapeHtml(cat.name)}</div>
+                    <div class="category-illustration-placeholder"><i class="fa-solid ${icon}"></i></div>
+                    <div class="category-body">
+                        <ul class="feature-list">${descItems.length ? descItems.map(x => `<li>${escapeHtml(x)}</li>`).join('') : '<li>Xem các thủ tục thuộc lĩnh vực này</li>'}</ul>
+                        <div class="text-center"><button class="btn btn-action-custom">THỰC HIỆN NGAY</button></div>
+                    </div>`;
+                col.appendChild(card);
+                container.appendChild(col);
+            });
+        }
+
+        function fillProcedureCategorySelect(selectedValue = null) {
+            const select = document.getElementById('editCategory');
+            if (!select) return;
+            const current = selectedValue ?? select.value;
+            select.innerHTML = allCategories.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+            if (current && allCategories.some(c => c.name === current)) select.value = current;
+        }
+
+        function handleCategoryBgUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Ảnh nền quá lớn! Vui lòng chọn ảnh nhỏ hơn 2MB.');
+                event.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('categoryBgImage').value = e.target.result;
+                updateCategoryBgPreview(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateCategoryBgPreview(url) {
+            const wrap = document.getElementById('categoryBgPreviewWrap');
+            const img = document.getElementById('categoryBgPreview');
+            if (url) { img.src = url; wrap.style.display = 'block'; }
+            else { img.src = ''; wrap.style.display = 'none'; }
+        }
+
+        function loadAdminCategoriesList() {
+            const container = document.getElementById('adminCategoriesTable');
+            if (!container) return;
+            container.innerHTML = '';
+            allCategories.forEach(cat => {
+                const div = document.createElement('div');
+                div.className = 'list-group-item d-flex justify-content-between align-items-center gap-2 p-2';
+                const thumb = cat.background_image
+                    ? `<img src="${escapeHtml(cat.background_image)}" class="category-bg-thumb" alt="Ảnh nền">`
+                    : `<span class="category-bg-thumb d-inline-block" style="background:${escapeHtml(cat.background_color || '#fff')}"></span>`;
+                div.innerHTML = `<div class="d-flex align-items-center gap-2">${thumb}<div><span class="badge bg-secondary me-2">${escapeHtml(cat.sort_order)}</span><strong>${escapeHtml(cat.name)}</strong></div></div><div class="text-nowrap"><button class="btn btn-sm btn-outline-primary me-1" onclick="editCategory(${cat.id})">Sửa</button><button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id})">Xóa</button></div>`;
+                container.appendChild(div);
+            });
+        }
+
+        function editCategory(id) {
+            const cat = allCategories.find(x => x.id === id);
+            if (!cat) return;
+            document.getElementById('editCategoryId').value = cat.id;
+            document.getElementById('categoryOrder').value = cat.sort_order || 1;
+            document.getElementById('categoryName').value = cat.name || '';
+            document.getElementById('categoryBgColor').value = cat.background_color || '#ffffff';
+            document.getElementById('categoryBgImage').value = cat.background_image || '';
+            document.getElementById('categoryDescription').value = cat.description || '';
+            document.getElementById('categoryBgFile').value = '';
+            updateCategoryBgPreview(cat.background_image || '');
+            document.getElementById('categoryFormTitle').innerText = 'Chỉnh Sửa Lĩnh Vực';
+        }
+
+        function resetCategoryForm() {
+            document.getElementById('editCategoryId').value = '';
+            document.getElementById('categoryOrder').value = (allCategories.length + 1);
+            document.getElementById('categoryName').value = '';
+            document.getElementById('categoryBgColor').value = '#ffffff';
+            document.getElementById('categoryBgImage').value = '';
+            document.getElementById('categoryDescription').value = '';
+            document.getElementById('categoryBgFile').value = '';
+            updateCategoryBgPreview('');
+            document.getElementById('categoryFormTitle').innerText = 'Thêm Lĩnh Vực Mới';
+        }
+
+        async function saveCategory() {
+            const id = document.getElementById('editCategoryId').value || null;
+            const name = document.getElementById('categoryName').value.trim();
+            if (!name) return alert('Vui lòng nhập tên lĩnh vực!');
+            const body = {
+                id,
+                sort_order: document.getElementById('categoryOrder').value,
+                name,
+                background_image: document.getElementById('categoryBgImage').value,
+                background_color: document.getElementById('categoryBgColor').value,
+                description: document.getElementById('categoryDescription').value
+            };
+            const res = await fetch('/api/admin/categories', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) { resetCategoryForm(); await loadCategories(); await loadProcedures(); loadAdminProceduresList(); }
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm('Bạn có chắc chắn muốn xóa lĩnh vực này?')) return;
+            const res = await fetch(`/api/admin/categories/${id}`, { method:'DELETE' });
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) await loadCategories();
+        }
+
+        async function loadProcedures() {
+            try {
+                const res = await fetch('/api/procedures');
+                const data = await res.json();
+                if(data.success) {
+                    allProcedures = data.data;
+                }
+            } catch (e) {
+                console.log("Database connection active");
+            }
+        }
+
+        function openCategoryModal(categoryName) {
+            document.getElementById('categoryModalTitle').innerText = categoryName;
+            const container = document.getElementById('modalProceduresList');
+            container.innerHTML = '';
+
+            const filtered = allProcedures.filter(p => p.category === categoryName);
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center p-4 text-muted fs-5">Chưa có hướng dẫn nào thuộc lĩnh vực này.</div>';
+            } else {
+                filtered.forEach((item, index) => {
+                    const a = document.createElement('a');
+                    a.href = '#';
+                    a.className = 'list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3';
+                    a.onclick = (e) => {
+                        e.preventDefault();
+                        watchVideo(item);
+                    };
+                    a.innerHTML = `
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-primary rounded-pill fs-6">${index + 1}</span>
+                            <div>
+                                <strong class="fs-6 text-dark d-block">${item.title}</strong>
+                                <small class="text-muted">${item.description || 'Bấm để xem video hướng dẫn chi tiết'}</small>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-circle-play fs-3 text-danger"></i>
+                    `;
+                    container.appendChild(a);
+                });
+            }
+
+            new bootstrap.Modal(document.getElementById('categoryListModal')).show();
+        }
+
+        function filterProcedures() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+            if(!keyword) return;
+
+            const filtered = allProcedures.filter(p => 
+                (p.title && p.title.toLowerCase().includes(keyword)) || 
+                (p.description && p.description.toLowerCase().includes(keyword))
+            );
+
+            document.getElementById('categoryModalTitle').innerText = `Kết Quả Tìm Kiếm: "${keyword}"`;
+            const container = document.getElementById('modalProceduresList');
+            container.innerHTML = '';
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center p-4 text-muted fs-5">Không tìm thấy thủ tục phù hợp.</div>';
+            } else {
+                filtered.forEach((item, index) => {
+                    const a = document.createElement('a');
+                    a.href = '#';
+                    a.className = 'list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3';
+                    a.onclick = (e) => {
+                        e.preventDefault();
+                        watchVideo(item);
+                    };
+                    a.innerHTML = `
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-success rounded-pill fs-6">${index + 1}</span>
+                            <div>
+                                <strong class="fs-6 text-dark d-block">${item.title}</strong>
+                                <small class="text-primary fw-bold">${item.category}</small>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-circle-play fs-3 text-danger"></i>
+                    `;
+                    container.appendChild(a);
+                });
+            }
+            new bootstrap.Modal(document.getElementById('categoryListModal')).show();
+        }
+
+        function watchVideo(item) {
+            document.getElementById('videoTitle').innerText = item.title;
+            document.getElementById('videoIframe').src = item.video_url;
+
+            // Xử lý Lỗi thường gặp
+            const errSec = document.getElementById('commonErrorsSection');
+            if (item.common_errors && item.common_errors.trim() !== '') {
+                document.getElementById('commonErrorsText').innerText = item.common_errors;
+                errSec.style.display = 'block';
+            } else {
+                errSec.style.display = 'none';
+            }
+
+            // Xử lý Tài liệu minh họa (Word / PDF)
+            const docSec = document.getElementById('documentSection');
+            if (item.document_url && item.document_url.trim() !== '') {
+                document.getElementById('docDownloadBtn').href = item.document_url;
+                docSec.style.display = 'block';
+            } else {
+                docSec.style.display = 'none';
+            }
+
+            new bootstrap.Modal(document.getElementById('videoModal')).show();
+        }
+
+        function closeVideo() {
+            document.getElementById('videoIframe').src = '';
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) {
+                    alert("Kích thước file quá lớn! Vui lòng chọn ảnh nhỏ hơn 2MB.");
+                    event.target.value = "";
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64Data = e.target.result;
+                    document.getElementById('editImageUrl').value = base64Data;
+                    updateImagePreview(base64Data);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleDocUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert("Kích thước file quá lớn! Vui lòng chọn file dưới 5MB.");
+                    event.target.value = "";
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('editDocUrl').value = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function updateImagePreview(url) {
+            const imgPreview = document.getElementById('imagePreview');
+            const previewContainer = document.getElementById('previewContainer');
+            if (url) {
+                imgPreview.src = url;
+                previewContainer.style.display = 'block';
+            } else {
+                previewContainer.style.display = 'none';
+            }
+        }
+
+        function showAdminModal() {
+            new bootstrap.Modal(document.getElementById('adminModal')).show();
+        }
+
+        async function loginAdmin() {
+            const u = document.getElementById('adminUser').value;
+            const p = document.getElementById('adminPass').value;
+
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                currentAdmin = data.user;
+                document.getElementById('adminLoginForm').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+                loadAdminProceduresList();
+                loadAdminCategoriesList();
+            } else {
+                alert(data.message);
+            }
+        }
+
+        function loadAdminProceduresList() {
+            const container = document.getElementById('adminProceduresTable');
+            container.innerHTML = '';
+
+            allProcedures.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-group-item d-flex justify-content-between align-items-center p-2';
+                div.innerHTML = `
+                    <div>
+                        <span class="badge bg-secondary me-2">${item.category ? item.category.split('.')[0] : '1'}</span>
+                        <strong>${item.title}</strong>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editProcedure(${item.id})">Sửa</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteProcedure(${item.id})">Xóa</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function editProcedure(id) {
+            const p = allProcedures.find(x => x.id === id);
+            if (!p) return;
+            document.getElementById('editId').value = p.id;
+            document.getElementById('editOrder').value = p.sort_order || 1;
+            fillProcedureCategorySelect(p.category || '');
+            document.getElementById('editTitle').value = p.title;
+            document.getElementById('editVideoUrl').value = p.video_url;
+            document.getElementById('editImageUrl').value = p.image_url || '';
+            document.getElementById('editDesc').value = p.description || '';
+            document.getElementById('editDocUrl').value = p.document_url || '';
+            document.getElementById('editCommonErrors').value = p.common_errors || '';
+            document.getElementById('editImageFile').value = '';
+            document.getElementById('editDocFile').value = '';
+            updateImagePreview(p.image_url);
+            document.getElementById('formProcedureTitle').innerText = 'Chỉnh Sửa Thủ Tục';
+        }
+
+        function resetForm() {
+            document.getElementById('editId').value = '';
+            document.getElementById('editOrder').value = 1;
+            fillProcedureCategorySelect(allCategories[0]?.name || '');
+            document.getElementById('editTitle').value = '';
+            document.getElementById('editVideoUrl').value = '';
+            document.getElementById('editImageUrl').value = '';
+            document.getElementById('editDesc').value = '';
+            document.getElementById('editDocUrl').value = '';
+            document.getElementById('editCommonErrors').value = '';
+            document.getElementById('editImageFile').value = '';
+            document.getElementById('editDocFile').value = '';
+            updateImagePreview('');
+            document.getElementById('formProcedureTitle').innerText = 'Thêm Thủ Tục Hành Chính Mới';
+        }
+
+        async function saveProcedure() {
+            const body = {
+                id: document.getElementById('editId').value || null,
+                sort_order: document.getElementById('editOrder').value,
+                category: document.getElementById('editCategory').value,
+                title: document.getElementById('editTitle').value,
+                video_url: document.getElementById('editVideoUrl').value,
+                image_url: document.getElementById('editImageUrl').value,
+                description: document.getElementById('editDesc').value,
+                document_url: document.getElementById('editDocUrl').value,
+                common_errors: document.getElementById('editCommonErrors').value
+            };
+
+            const res = await fetch('/api/admin/procedures', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) {
+                resetForm();
+                await loadProcedures();
+                loadAdminProceduresList();
+            }
+        }
+
+        async function deleteProcedure(id) {
+            if (!confirm('Bạn có chắc chắn muốn xóa thủ tục này?')) return;
+            const res = await fetch(`/api/admin/procedures/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) {
+                await loadProcedures();
+                loadAdminProceduresList();
+            }
+        }
+
+        async function changePassword() {
+            const oldPassword = document.getElementById('oldPass').value;
+            const newPassword = document.getElementById('newPass').value;
+
+            if (!oldPassword || !newPassword) {
+                alert('Vui lòng nhập đủ thông tin!');
+                return;
+            }
+
+            const res = await fetch('/api/admin/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentAdmin.username, oldPassword, newPassword })
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (data.success) {
+                document.getElementById('oldPass').value = '';
+                document.getElementById('newPass').value = '';
+            }
+        }
+    </script>
+</body>
+</html>

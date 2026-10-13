@@ -1,0 +1,15 @@
+{
+  "name": "phan-mem-bao-com",
+  "version": "2.0.0",
+  "description": "Phần mềm Báo cơm Nội bộ - Turso Cloud Synced",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}

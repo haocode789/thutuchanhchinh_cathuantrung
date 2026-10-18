@@ -1,5 +1,6 @@
 const express = require('express');
-const { createClient } = require('@libsql/client');
+const path = require('path');
+const { createClient } = require('@libsql/client/web');
 
 let compression = null;
 try { compression = require('compression'); } catch (_) { /* tùy chọn: chạy npm install để bật nén gzip */ }
@@ -10,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 if (compression) app.use(compression());
-app.use(express.static('public', {
+app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
@@ -18,13 +19,12 @@ app.use(express.static('public', {
 }));
 
 if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-  console.error('❌ LỖI NGHIÊM TRỌNG: Chưa cấu hình TURSO_DATABASE_URL hoặc TURSO_AUTH_TOKEN!');
-  process.exit(1);
+  console.error('❌ LỖI: Chưa cấu hình TURSO_DATABASE_URL hoặc TURSO_AUTH_TOKEN!');
 }
 
 const db = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN
+  url: (process.env.TURSO_DATABASE_URL || '').trim(),
+  authToken: (process.env.TURSO_AUTH_TOKEN || '').trim()
 });
 
 
@@ -236,9 +236,22 @@ async function initDB() {
     getHome().catch(() => {});
   } catch (err) {
     console.error('❌ Lỗi kết nối CSDL:', err.message);
+    throw err;
   }
 }
-initDB();
+
+// Vercel (serverless): khởi tạo CSDL 1 lần, các request /api chờ xong rồi mới chạy
+let dbReady = null;
+app.use('/api', async (_req, res, next) => {
+  try {
+    if (!dbReady) dbReady = initDB();
+    await dbReady;
+    next();
+  } catch (err) {
+    dbReady = null; // lần sau thử lại
+    res.status(500).json({ success: false, message: 'Lỗi kết nối CSDL: ' + err.message });
+  }
+});
 
 app.get('/api/home', async (_req, res) => {
   try {
@@ -482,4 +495,9 @@ app.get('/api/stats', async (_req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Vercel: export app. Render/máy tính: vẫn listen như bình thường.
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}

@@ -1,6 +1,6 @@
 {
   "name": "phan-mem-bao-com",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Phần mềm Báo cơm Nội bộ - Turso Cloud Synced",
   "main": "server.js",
   "scripts": {

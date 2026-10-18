@@ -221,11 +221,14 @@ async function initDB() {
       [2, '2. LĨNH VỰC ĐĂNG KÝ XE', '#ffccbc'],
       [3, '3. LĨNH VỰC CẤP HỘ CHIẾU', '#bbdefb']
     ];
-    for (const [sort_order, name, background_color] of defaultCategories) {
-      await db.execute({
-        sql: `INSERT OR IGNORE INTO categories (sort_order, name, background_image, background_color, description) VALUES (?, ?, '', ?, '')`,
-        args: [sort_order, name, background_color]
-      });
+    const catCount = await db.execute(`SELECT COUNT(*) AS total FROM categories`);
+    if (Number(catCount.rows[0].total) === 0) { // chỉ tạo lĩnh vực mẫu lần đầu, không tạo lại những lĩnh vực bạn đã xóa/đổi tên
+      for (const [sort_order, name, background_color] of defaultCategories) {
+        await db.execute({
+          sql: `INSERT OR IGNORE INTO categories (sort_order, name, background_image, background_color, description) VALUES (?, ?, '', ?, '')`,
+          args: [sort_order, name, background_color]
+        });
+      }
     }
 
     const adminCheck = await db.execute(`SELECT username FROM users WHERE username = 'admin'`);
@@ -302,13 +305,61 @@ app.post('/api/admin/change-password', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// Gán danh sách thủ tục vào 1 lĩnh vực (category = tên lĩnh vực, '' = chưa phân lĩnh vực).
+// replace = true: thủ tục đang thuộc lĩnh vực này nhưng không nằm trong ids sẽ chuyển về "chưa phân lĩnh vực".
+async function assignProcedures(category, ids, replace) {
+  category = String(category == null ? '' : category).trim();
+  ids = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter(Number.isFinite))];
+  let info = {};
+  if (category) {
+    const r = await db.execute({ sql: `SELECT agency, map_url, phone FROM categories WHERE name = ?`, args: [category] });
+    if (!r.rows.length) throw new Error('Không tìm thấy lĩnh vực!');
+    info = r.rows[0];
+  }
+  const stmts = [];
+  if (replace && category) {
+    stmts.push({
+      sql: `UPDATE procedures SET category = '', agency = '', map_url = '', phone = '', address = '' WHERE category = ?${ids.length ? ` AND id NOT IN (${ids.map(() => '?').join(',')})` : ''}`,
+      args: [category, ...ids]
+    });
+  }
+  if (ids.length) {
+    const cur = await db.execute({ sql: `SELECT id, category FROM procedures WHERE id IN (${ids.map(() => '?').join(',')})`, args: ids });
+    const was = new Map(cur.rows.map(r => [Number(r.id), String(r.category || '')]));
+    const mx = await db.execute({ sql: `SELECT COALESCE(MAX(sort_order), 0) AS m FROM procedures WHERE category = ?`, args: [category] });
+    let next = Number(mx.rows[0].m) || 0;
+    ids.forEach(id => {
+      if (!was.has(id)) return;
+      const moved = was.get(id) !== category; // thủ tục mới chuyển đến thì xếp xuống cuối lĩnh vực
+      stmts.push({
+        sql: `UPDATE procedures SET category = ?, agency = ?, map_url = ?, phone = ?, address = ''${moved ? ', sort_order = ?' : ''} WHERE id = ?`,
+        args: [category, info.agency || '', info.map_url || '', info.phone || '', ...(moved ? [++next] : []), id]
+      });
+    });
+  }
+  if (stmts.length) await db.batch(stmts, 'write');
+  bust();
+  return ids.length;
+}
+
+app.post('/api/admin/procedures/assign', async (req, res) => {
+  const b = req.body || {};
+  const ids = Array.isArray(b.ids) ? b.ids.map(Number).filter(Number.isFinite) : [];
+  const category = String(b.category == null ? '' : b.category).trim();
+  if (!ids.length && !(b.replace && category)) return res.json({ success: false, message: 'Chưa chọn thủ tục nào.' });
+  try {
+    const n = await assignProcedures(category, ids, !!b.replace);
+    res.json({ success: true, message: category ? `Đã chuyển ${n} thủ tục vào “${category}”.` : `Đã chuyển ${n} thủ tục về mục “Chưa phân lĩnh vực”.` });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 app.get('/api/categories', async (_req, res) => {
   try { res.json({ success: true, data: (await getHome()).categories }); }
   catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 app.post('/api/admin/categories', async (req, res) => {
-  const { id, sort_order, name, background_image, background_color, description, agency, map_url, phone, parent_id } = req.body || {};
+  const { id, sort_order, name, background_image, background_color, description, agency, map_url, phone, parent_id, procedure_ids } = req.body || {};
   const cleanName = String(name || '').trim();
   if (!cleanName) return res.json({ success: false, message: 'Vui lòng nhập tên lĩnh vực!' });
   const orderNum = Math.max(1, parseInt(sort_order, 10) || 1);
@@ -341,15 +392,19 @@ app.post('/api/admin/categories', async (req, res) => {
         sql: `UPDATE procedures SET agency = ?, map_url = ?, phone = ?, address = '' WHERE category = ?`,
         args: [agency || '', map_url || '', phone || '', cleanName]
       });
+      let assigned = null;
+      if (Array.isArray(procedure_ids)) assigned = await assignProcedures(cleanName, procedure_ids, true);
       bust();
-      return res.json({ success: true, message: 'Cập nhật lĩnh vực thành công!' });
+      return res.json({ success: true, id: Number(id), message: 'Cập nhật lĩnh vực thành công!' + (assigned === null ? '' : ` Có ${assigned} thủ tục thuộc lĩnh vực này.`) });
     }
-    await db.execute({
+    const ins = await db.execute({
       sql: `INSERT INTO categories (sort_order, parent_id, name, background_image, background_color, description, agency, map_url, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [orderNum, parentId, cleanName, background_image || '', background_color || '#ffffff', description || '', agency || '', map_url || '', phone || '']
     });
+    let assigned = null;
+    if (Array.isArray(procedure_ids) && procedure_ids.length) assigned = await assignProcedures(cleanName, procedure_ids, true);
     bust();
-    res.json({ success: true, message: parentId ? 'Thêm lĩnh vực con thành công!' : 'Thêm lĩnh vực mới thành công!' });
+    res.json({ success: true, id: Number(ins.lastInsertRowid), message: (parentId ? 'Thêm lĩnh vực con thành công!' : 'Thêm lĩnh vực mới thành công!') + (assigned ? ` Đã đưa ${assigned} thủ tục vào lĩnh vực này.` : '') });
   } catch (err) {
     const msg = /unique/i.test(String(err.message)) ? 'Tên lĩnh vực đã tồn tại!' : 'Lỗi lưu lĩnh vực: ' + err.message;
     res.status(500).json({ success: false, message: msg });
@@ -398,7 +453,7 @@ app.post('/api/admin/procedures', async (req, res) => {
   const values = {
     sort_order: Math.max(1, parseInt(b.sort_order, 10) || 1),
     title: String(b.title).trim(),
-    category: String(b.category || '').trim() || '1. LĨNH VỰC QUẢN LÝ CƯ TRÚ',
+    category: String(b.category == null ? '' : b.category).trim(), // rỗng = chưa phân lĩnh vực
     video_url: formatVideoEmbedUrl(b.video_url),
     image_url: b.image_url || '',
     description: b.description || '',

@@ -1,5 +1,7 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { createClient } = require('@libsql/client/web');
 
 let compression = null;
@@ -28,12 +30,56 @@ const db = createClient({
 });
 
 
+
+/* ====== XÁC THỰC QUẢN TRỊ ======
+   - Mật khẩu lưu dạng bcrypt (mật khẩu cũ dạng chữ thường sẽ tự được mã hóa ở lần đăng nhập đầu tiên)
+   - Đăng nhập thành công trả về token ký HMAC (hết hạn sau 12 giờ). Mọi API /api/admin/* đều phải gửi token này.
+   - Token không cần lưu ở máy chủ nên chạy tốt trên Vercel (serverless). Nên đặt biến môi trường AUTH_SECRET (chuỗi dài, ngẫu nhiên). */
+const AUTH_SECRET = process.env.AUTH_SECRET || crypto.createHash('sha256').update('tthc|' + (process.env.TURSO_AUTH_TOKEN || 'dev')).digest('hex');
+const TOKEN_TTL = 12 * 60 * 60 * 1000;
+function signToken(username) {
+  const body = Buffer.from(JSON.stringify({ u: username, exp: Date.now() + TOKEN_TTL })).toString('base64url');
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
+  return body + '.' + sig;
+}
+function verifyToken(token) {
+  if (typeof token !== 'string') return null;
+  const [body, sig] = token.split('.');
+  if (!body || !sig) return null;
+  const expect = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
+  const a = Buffer.from(sig), b = Buffer.from(expect);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, 'base64url').toString());
+    return p && p.exp > Date.now() ? p : null;
+  } catch (_) { return null; }
+}
+function requireAdmin(req, res, next) {
+  const h = req.headers.authorization || '';
+  const p = verifyToken(h.startsWith('Bearer ') ? h.slice(7) : '');
+  if (!p) return res.status(401).json({ success: false, message: 'Phiên đăng nhập đã hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập lại!' });
+  req.admin = p;
+  next();
+}
+const isHashed = v => /^\$2[aby]\$/.test(String(v || ''));
+// Kiểm tra mật khẩu (hỗ trợ cả mật khẩu cũ chưa mã hóa)
+async function checkPassword(plain, stored) {
+  plain = String(plain || ''); stored = String(stored || '');
+  if (!plain || !stored) return false;
+  return isHashed(stored) ? bcrypt.compare(plain, stored) : plain === stored;
+}
+// Chặn dò mật khẩu: tối đa 8 lần sai / 10 phút cho mỗi tài khoản + địa chỉ IP (tính theo từng container)
+const loginFails = new Map();
+function loginKey(req, username) { return String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim() + '|' + String(username || '').toLowerCase(); }
+function isLocked(key) { const f = loginFails.get(key); return !!f && f.n >= 8 && Date.now() - f.at < 10 * 60 * 1000; }
+function noteFail(key) { const f = loginFails.get(key); loginFails.set(key, { n: f && Date.now() - f.at < 10 * 60 * 1000 ? f.n + 1 : 1, at: Date.now() }); if (loginFails.size > 500) loginFails.delete(loginFails.keys().next().value); }
+
 /* ====== BỘ NHỚ ĐỆM + DỮ LIỆU NHẸ CHO TRANG CHỦ ======
    - Ảnh/logo dạng data:URL (base64) KHÔNG còn nằm trong JSON; được trả qua /api/media/... (có cache trình duyệt)
    - Danh sách thủ tục không kèm file Word/PDF/ảnh (chỉ lấy khi mở chi tiết)
    - Một API /api/home trả về cả cấu hình + lĩnh vực + thủ tục, có cache bộ nhớ phía server */
 const APP_VERSION = (() => { try { return require('./package.json').version || ''; } catch (_) { return ''; } })();
-const HOME_TTL = 30000;
+const HOME_TTL = 10000; // 10 giây: trên Vercel mỗi container có bộ nhớ riêng nên để ngắn để các container cập nhật nhanh sau khi sửa dữ liệu
 const MEDIA_SETTINGS = ['bg_image', 'site_logo'];
 let homeCache = null;
 const fullCache = new Map();
@@ -233,7 +279,7 @@ async function initDB() {
 
     const adminCheck = await db.execute(`SELECT username FROM users WHERE username = 'admin'`);
     if (adminCheck.rows.length === 0) {
-      await db.execute(`INSERT INTO users VALUES ('admin', '123456', 'admin', 'Quản trị viên')`);
+      await db.execute({ sql: `INSERT INTO users VALUES ('admin', ?, 'admin', 'Quản trị viên')`, args: [await bcrypt.hash('123456', 10)] });
     }
     console.log('🚀 Khởi tạo CSDL thành công!');
     getHome().catch(() => {});
@@ -245,6 +291,8 @@ async function initDB() {
 
 // Vercel (serverless): khởi tạo CSDL 1 lần, các request /api chờ xong rồi mới chạy
 let dbReady = null;
+app.use('/api/admin', requireAdmin);
+
 app.use('/api', async (_req, res, next) => {
   try {
     if (!dbReady) dbReady = initDB();
@@ -285,22 +333,32 @@ app.post('/api/admin/settings', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body || {};
+  const key = loginKey(req, username);
+  if (isLocked(key)) return res.status(429).json({ success: false, message: 'Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 10 phút!' });
   try {
-    const result = await db.execute({ sql: `SELECT * FROM users WHERE username = ? AND password = ?`, args: [username, password] });
-    if (result.rows.length) {
-      const u = result.rows[0];
-      return res.json({ success: true, user: { username: u.username, name: u.name, role: u.role } });
+    const result = await db.execute({ sql: `SELECT * FROM users WHERE username = ?`, args: [String(username || '')] });
+    const u = result.rows[0];
+    if (u && await checkPassword(password, u.password)) {
+      if (!isHashed(u.password)) { // nâng cấp mật khẩu cũ lên dạng mã hóa
+        await db.execute({ sql: `UPDATE users SET password = ? WHERE username = ?`, args: [await bcrypt.hash(String(password), 10), u.username] });
+      }
+      loginFails.delete(key);
+      return res.json({ success: true, token: signToken(u.username), user: { username: u.username, name: u.name, role: u.role } });
     }
+    noteFail(key);
     res.json({ success: false, message: 'Tên đăng nhập hoặc mật khẩu không chính xác!' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 app.post('/api/admin/change-password', async (req, res) => {
-  const { username, oldPassword, newPassword } = req.body || {};
+  const { oldPassword, newPassword } = req.body || {};
+  const username = req.admin.u; // lấy từ token, không tin tên gửi lên
   try {
-    const check = await db.execute({ sql: `SELECT username FROM users WHERE username = ? AND password = ?`, args: [username, oldPassword] });
-    if (!check.rows.length) return res.json({ success: false, message: 'Mật khẩu cũ không đúng!' });
-    await db.execute({ sql: `UPDATE users SET password = ? WHERE username = ?`, args: [newPassword, username] });
+    if (!oldPassword || !newPassword) return res.json({ success: false, message: 'Vui lòng nhập đủ thông tin!' });
+    if (String(newPassword).length < 6) return res.json({ success: false, message: 'Mật khẩu mới phải từ 6 ký tự trở lên!' });
+    const check = await db.execute({ sql: `SELECT password FROM users WHERE username = ?`, args: [username] });
+    if (!check.rows.length || !(await checkPassword(oldPassword, check.rows[0].password))) return res.json({ success: false, message: 'Mật khẩu cũ không đúng!' });
+    await db.execute({ sql: `UPDATE users SET password = ? WHERE username = ?`, args: [await bcrypt.hash(String(newPassword), 10), username] });
     res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });

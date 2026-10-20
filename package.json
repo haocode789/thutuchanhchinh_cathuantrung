@@ -1,7 +1,7 @@
 {
-  "name": "phan-mem-bao-com",
-  "version": "2.2.0",
-  "description": "Phần mềm Báo cơm Nội bộ - Turso Cloud Synced",
+  "name": "ho-tro-thu-tuc-hanh-chinh",
+  "version": "2.3.0",
+  "description": "Phần mềm Hỗ trợ Thủ tục Hành chính - Turso Cloud",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

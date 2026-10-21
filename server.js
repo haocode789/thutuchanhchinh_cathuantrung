@@ -214,6 +214,14 @@ async function initDB() {
       can_approve INTEGER DEFAULT 0,
       PRIMARY KEY (username, category_id)
     )`);
+    await db.execute(`CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT DEFAULT '',
+      action TEXT DEFAULT '',
+      method TEXT DEFAULT '',
+      path TEXT DEFAULT '',
+      created_at TEXT DEFAULT ''
+    )`);
 
     await db.execute(`CREATE TABLE IF NOT EXISTS procedures (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -339,6 +347,36 @@ app.use('/api/admin', async (req, res, next) => {
     req.adminUser = u;
     next();
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+function auditAction(req) {
+  const p = String(req.path || '');
+  if (p.includes('/categories')) return req.method === 'DELETE' ? 'Xóa lĩnh vực' : 'Cập nhật lĩnh vực';
+  if (p.includes('/procedures')) return req.method === 'DELETE' ? 'Xóa thủ tục' : 'Cập nhật thủ tục';
+  if (p.includes('/users') && p.includes('/permissions')) return 'Cập nhật phân quyền';
+  if (p.includes('/users')) return req.method === 'DELETE' ? 'Xóa tài khoản' : 'Cập nhật tài khoản';
+  if (p.includes('/settings')) return 'Cập nhật giao diện/cấu hình';
+  if (p.includes('/notices')) return req.method === 'DELETE' ? 'Xóa thông báo' : 'Cập nhật thông báo';
+  if (p.includes('/change-password')) return 'Đổi mật khẩu';
+  return 'Thay đổi dữ liệu quản trị';
+}
+// Ghi lịch sử tự động cho mọi thao tác làm thay đổi dữ liệu quản trị.
+app.use('/api/admin', (req, res, next) => {
+  if (!['POST','PUT','PATCH','DELETE'].includes(req.method)) return next();
+  const started = Date.now();
+  res.on('finish', () => {
+    if (res.statusCode >= 400) return;
+    db.execute({sql:`INSERT INTO audit_logs (username,action,method,path,created_at) VALUES (?,?,?,?,?)`,args:[String(req.adminUser?.username||req.admin?.u||''),auditAction(req),req.method,String(req.originalUrl||req.path||''),new Date().toISOString()] }).catch(()=>{});
+  });
+  next();
+});
+
+app.get('/api/admin/history', async (req, res) => {
+  if (!isSuperAdmin(req)) return deny(res, 'Chỉ quản trị viên hệ thống mới được xem lịch sử thay đổi.');
+  try {
+    const r = await db.execute(`SELECT id,username,action,method,path,created_at FROM audit_logs ORDER BY id DESC LIMIT 120`);
+    res.json({success:true,data:r.rows});
+  } catch(err) { res.status(500).json({success:false,message:err.message}); }
 });
 
 function isSuperAdmin(req) {

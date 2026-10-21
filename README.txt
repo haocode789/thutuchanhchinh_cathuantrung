@@ -1,24 +1,11 @@
-THUẬN TRUNG v3.1.1 - GÓI CẬP NHẬT ĐẦY ĐỦ CHO VERCEL
+THUẬN TRUNG v3.2.0
 
-Cấu trúc đúng:
-- server.js
-- package.json
-- vercel.json
-- public/index.html
-- public/watch.html
-
-Các thay đổi chính:
-- Giao diện quản trị mới theo mẫu đã cung cấp.
-- Có tab Tài khoản & Phân quyền.
-- Admin hệ thống có toàn quyền.
-- Cho phép xóa mục/lĩnh vực lớn kể cả khi đang có lĩnh vực con.
-- Khi xóa mục lớn, các mục con bị xóa theo; thủ tục KHÔNG bị xóa mà chuyển về “Chưa phân lĩnh vực”.
-- Dòng “Hệ thống phần mềm © Công an xã Thuần Trung” là cố định, không có trường chỉnh sửa trong quản trị.
-- Bổ sung vercel.json còn thiếu để Vercel build server.js và đưa thư mục public vào deployment.
-
-Triển khai Vercel:
-1. Giải nén và đưa nguyên cấu trúc thư mục lên dự án.
-2. Giữ các biến môi trường TURSO_DATABASE_URL, TURSO_AUTH_TOKEN và AUTH_SECRET như hiện tại.
-3. Deploy lại.
-
-Nên sao lưu CSDL trước khi triển khai.
+Bản chỉnh sửa theo giao diện mẫu người dùng cung cấp:
+- Giao diện trang chủ FULL SCREEN: bỏ giới hạn chiều rộng 1400px, dùng toàn bộ màn hình.
+- Sidebar, hero, thống kê và thẻ lĩnh vực được cân lại để giống bố cục ảnh mẫu.
+- Bảng quản trị gần toàn màn hình, thanh tiêu đề xanh, thanh tìm kiếm/tạo mới/đồng bộ/lịch sử, tab và 2 khung quản lý theo ảnh mẫu.
+- Tài khoản & Phân quyền giữ bố cục 3 cột và quyền theo từng lĩnh vực.
+- Admin có thể xóa cả mục lớn; mục con bị xóa cùng, thủ tục không mất mà chuyển về “Chưa phân lĩnh vực”.
+- Có Lịch sử thay đổi quản trị (audit log) mới.
+- Dòng “Hệ thống phần mềm © Công an xã Thuần Trung” là cố định, không cho sửa.
+- Cấu trúc Vercel đầy đủ: server.js, package.json, vercel.json, public/index.html, public/watch.html.

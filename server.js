@@ -198,6 +198,22 @@ async function initDB() {
       role TEXT,
       name TEXT
     )`);
+    for (const [name, type] of [
+      ['email', "TEXT DEFAULT ''"], ['phone', "TEXT DEFAULT ''"],
+      ['status', "TEXT DEFAULT 'active'"], ['created_by', "TEXT DEFAULT ''"],
+      ['created_at', "TEXT DEFAULT ''"], ['must_change_password', 'INTEGER DEFAULT 1'],
+      ['is_superadmin', 'INTEGER DEFAULT 0']
+    ]) await ensureColumn('users', name, type);
+    await db.execute(`CREATE TABLE IF NOT EXISTS user_permissions (
+      username TEXT NOT NULL,
+      category_id INTEGER NOT NULL,
+      can_view INTEGER DEFAULT 0,
+      can_add INTEGER DEFAULT 0,
+      can_edit INTEGER DEFAULT 0,
+      can_delete INTEGER DEFAULT 0,
+      can_approve INTEGER DEFAULT 0,
+      PRIMARY KEY (username, category_id)
+    )`);
 
     await db.execute(`CREATE TABLE IF NOT EXISTS procedures (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -287,7 +303,9 @@ async function initDB() {
 
     const adminCheck = await db.execute(`SELECT username FROM users WHERE username = 'admin'`);
     if (adminCheck.rows.length === 0) {
-      await db.execute({ sql: `INSERT INTO users VALUES ('admin', ?, 'admin', 'Quản trị viên')`, args: [await bcrypt.hash('123456', 10)] });
+      await db.execute({ sql: `INSERT INTO users (username,password,role,name,status,created_at,must_change_password,is_superadmin) VALUES ('admin', ?, 'admin', 'Quản trị viên', 'active', ?, 1, 1)`, args: [await bcrypt.hash('123456', 10), new Date().toISOString()] });
+    } else {
+      await db.execute(`UPDATE users SET role='admin', is_superadmin=1, status='active' WHERE username='admin'`);
     }
     console.log('🚀 Khởi tạo CSDL thành công!');
     getHome().catch(() => {});
@@ -312,6 +330,39 @@ app.use('/api', async (_req, res, next) => {
   }
 });
 
+// Nạp tài khoản hiện hành cho các API quản trị và kiểm tra trạng thái tài khoản.
+app.use('/api/admin', async (req, res, next) => {
+  try {
+    const r = await db.execute({ sql: `SELECT username, role, name, email, phone, status, COALESCE(is_superadmin,0) AS is_superadmin FROM users WHERE username = ?`, args: [req.admin.u] });
+    const u = r.rows[0];
+    if (!u || String(u.status || 'active') !== 'active') return res.status(403).json({ success: false, message: 'Tài khoản đã bị khóa hoặc không còn tồn tại.' });
+    req.adminUser = u;
+    next();
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+function isSuperAdmin(req) {
+  return !!(req.adminUser && (String(req.adminUser.role) === 'admin' || Number(req.adminUser.is_superadmin) === 1));
+}
+function deny(res, message='Bạn không có quyền thực hiện thao tác này.') { return res.status(403).json({ success:false, message }); }
+async function permissionFor(req, categoryId, action='view') {
+  if (isSuperAdmin(req)) return true;
+  categoryId = Number(categoryId);
+  if (!categoryId) return false;
+  const cat = await db.execute({ sql:`SELECT id, COALESCE(parent_id,0) AS parent_id FROM categories WHERE id=?`, args:[categoryId] });
+  if (!cat.rows.length) return false;
+  const ids = [categoryId];
+  const parentId = Number(cat.rows[0].parent_id || 0);
+  if (parentId) ids.push(parentId);
+  const col = ({view:'can_view',add:'can_add',edit:'can_edit',delete:'can_delete',approve:'can_approve'})[action] || 'can_view';
+  const q = await db.execute({ sql:`SELECT ${col} AS allowed FROM user_permissions WHERE username=? AND category_id IN (${ids.map(()=>'?').join(',')})`, args:[req.adminUser.username, ...ids] });
+  return q.rows.some(x => Number(x.allowed) === 1);
+}
+async function categoryIdByName(name) {
+  const r = await db.execute({ sql:`SELECT id FROM categories WHERE name=? LIMIT 1`, args:[String(name||'').trim()] });
+  return r.rows.length ? Number(r.rows[0].id) : 0;
+}
+
 app.get('/api/home', async (_req, res) => {
   try {
     res.set('Cache-Control', 'no-cache');
@@ -325,6 +376,7 @@ app.get('/api/settings', async (_req, res) => {
 });
 
 app.post('/api/admin/settings', async (req, res) => {
+  if (!isSuperAdmin(req)) return deny(res, 'Chỉ quản trị viên hệ thống mới được sửa giao diện.');
   try {
     for (const [key, rawValue] of Object.entries(req.body || {})) {
       if (typeof rawValue === 'string' && rawValue.startsWith('/api/media/setting/')) continue; // ảnh không đổi
@@ -346,12 +398,13 @@ app.post('/api/login', async (req, res) => {
   try {
     const result = await db.execute({ sql: `SELECT * FROM users WHERE username = ?`, args: [String(username || '')] });
     const u = result.rows[0];
+    if (u && String(u.status || 'active') !== 'active') return res.status(403).json({ success:false, message:'Tài khoản đang bị khóa.' });
     if (u && await checkPassword(password, u.password)) {
       if (!isHashed(u.password)) { // nâng cấp mật khẩu cũ lên dạng mã hóa
         await db.execute({ sql: `UPDATE users SET password = ? WHERE username = ?`, args: [await bcrypt.hash(String(password), 10), u.username] });
       }
       loginFails.delete(key);
-      return res.json({ success: true, token: signToken(u.username), user: { username: u.username, name: u.name, role: u.role } });
+      return res.json({ success: true, token: signToken(u.username), user: { username: u.username, name: u.name, role: u.role, email:u.email||'', phone:u.phone||'', is_superadmin:Number(u.is_superadmin||0), must_change_password:Number(u.must_change_password||0) } });
     }
     noteFail(key);
     res.json({ success: false, message: 'Tên đăng nhập hoặc mật khẩu không chính xác!' });
@@ -369,6 +422,67 @@ app.post('/api/admin/change-password', async (req, res) => {
     await db.execute({ sql: `UPDATE users SET password = ? WHERE username = ?`, args: [await bcrypt.hash(String(newPassword), 10), username] });
     res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ====== TÀI KHOẢN CON & PHÂN QUYỀN ======
+app.get('/api/admin/users', async (req, res) => {
+  if (!isSuperAdmin(req)) return deny(res, 'Chỉ quản trị viên hệ thống mới được quản lý tài khoản.');
+  try {
+    const r = await db.execute(`SELECT username,name,role,email,phone,status,created_by,created_at,COALESCE(must_change_password,0) AS must_change_password,COALESCE(is_superadmin,0) AS is_superadmin FROM users ORDER BY is_superadmin DESC, username ASC`);
+    res.json({success:true,data:r.rows});
+  } catch(err){ res.status(500).json({success:false,message:err.message}); }
+});
+
+app.post('/api/admin/users', async (req, res) => {
+  if (!isSuperAdmin(req)) return deny(res, 'Chỉ quản trị viên hệ thống mới được quản lý tài khoản.');
+  const b=req.body||{}; const username=String(b.username||'').trim().toLowerCase(); const name=String(b.name||'').trim();
+  if(!/^[a-z0-9._-]{3,40}$/.test(username)) return res.json({success:false,message:'Tên đăng nhập từ 3-40 ký tự, chỉ dùng chữ thường, số, dấu chấm, gạch dưới hoặc gạch ngang.'});
+  if(!name) return res.json({success:false,message:'Vui lòng nhập họ tên.'});
+  const status=String(b.status||'active')==='locked'?'locked':'active';
+  try {
+    const exists=await db.execute({sql:`SELECT username,is_superadmin FROM users WHERE username=?`,args:[username]});
+    if(exists.rows.length){
+      if(Number(exists.rows[0].is_superadmin)===1 && username!==req.adminUser.username) return deny(res,'Không thể sửa quản trị viên hệ thống khác.');
+      await db.execute({sql:`UPDATE users SET name=?, email=?, phone=?, status=? WHERE username=?`,args:[name,String(b.email||'').trim(),String(b.phone||'').trim(),status,username]});
+      if(String(b.password||'').length){ if(String(b.password).length<6)return res.json({success:false,message:'Mật khẩu phải từ 6 ký tự.'}); await db.execute({sql:`UPDATE users SET password=?, must_change_password=1 WHERE username=?`,args:[await bcrypt.hash(String(b.password),10),username]}); }
+      return res.json({success:true,message:'Đã cập nhật tài khoản.'});
+    }
+    if(String(b.password||'').length<6) return res.json({success:false,message:'Mật khẩu ban đầu phải từ 6 ký tự.'});
+    await db.execute({sql:`INSERT INTO users (username,password,role,name,email,phone,status,created_by,created_at,must_change_password,is_superadmin) VALUES (?,?,?,?,?,?,?,?,?,1,0)`,args:[username,await bcrypt.hash(String(b.password),10),'staff',name,String(b.email||'').trim(),String(b.phone||'').trim(),status,req.adminUser.username,new Date().toISOString()]});
+    res.json({success:true,message:'Đã tạo tài khoản con.'});
+  } catch(err){ const msg=/unique/i.test(String(err.message))?'Tên đăng nhập đã tồn tại.':err.message; res.status(500).json({success:false,message:msg}); }
+});
+
+app.delete('/api/admin/users/:username', async (req,res)=>{
+  if(!isSuperAdmin(req)) return deny(res,'Chỉ quản trị viên hệ thống mới được quản lý tài khoản.');
+  const username=String(req.params.username||'').trim();
+  if(username===req.adminUser.username) return res.json({success:false,message:'Không thể xóa tài khoản đang đăng nhập.'});
+  try{
+    const r=await db.execute({sql:`SELECT COALESCE(is_superadmin,0) AS is_superadmin FROM users WHERE username=?`,args:[username]});
+    if(!r.rows.length)return res.json({success:false,message:'Không tìm thấy tài khoản.'});
+    if(Number(r.rows[0].is_superadmin)===1)return deny(res,'Không thể xóa quản trị viên hệ thống.');
+    await db.batch([{sql:`DELETE FROM user_permissions WHERE username=?`,args:[username]},{sql:`DELETE FROM users WHERE username=?`,args:[username]}],'write');
+    res.json({success:true,message:'Đã xóa tài khoản.'});
+  }catch(err){res.status(500).json({success:false,message:err.message});}
+});
+
+app.get('/api/admin/users/:username/permissions', async (req,res)=>{
+  if(!isSuperAdmin(req) && String(req.params.username)!==String(req.adminUser.username)) return deny(res);
+  try{const r=await db.execute({sql:`SELECT category_id,can_view,can_add,can_edit,can_delete,can_approve FROM user_permissions WHERE username=?`,args:[String(req.params.username)]});res.json({success:true,data:r.rows});}
+  catch(err){res.status(500).json({success:false,message:err.message});}
+});
+
+app.post('/api/admin/users/:username/permissions', async (req,res)=>{
+  if(!isSuperAdmin(req)) return deny(res,'Chỉ quản trị viên hệ thống mới được phân quyền.');
+  const username=String(req.params.username||'').trim(); const rows=Array.isArray(req.body?.permissions)?req.body.permissions:[];
+  try{
+    const u=await db.execute({sql:`SELECT COALESCE(is_superadmin,0) AS is_superadmin FROM users WHERE username=?`,args:[username]});
+    if(!u.rows.length)return res.json({success:false,message:'Không tìm thấy tài khoản.'});
+    if(Number(u.rows[0].is_superadmin)===1)return res.json({success:false,message:'Quản trị viên hệ thống luôn có toàn quyền, không cần phân quyền.'});
+    const stmts=[{sql:`DELETE FROM user_permissions WHERE username=?`,args:[username]}];
+    for(const x of rows){const cid=Number(x.category_id);if(!cid)continue;stmts.push({sql:`INSERT INTO user_permissions (username,category_id,can_view,can_add,can_edit,can_delete,can_approve) VALUES (?,?,?,?,?,?,?)`,args:[username,cid,x.can_view?1:0,x.can_add?1:0,x.can_edit?1:0,x.can_delete?1:0,x.can_approve?1:0]});}
+    await db.batch(stmts,'write'); res.json({success:true,message:'Đã lưu phân quyền.'});
+  }catch(err){res.status(500).json({success:false,message:err.message});}
 });
 
 // Gán danh sách thủ tục vào 1 lĩnh vực (category = tên lĩnh vực, '' = chưa phân lĩnh vực).
@@ -414,6 +528,8 @@ app.post('/api/admin/procedures/assign', async (req, res) => {
   const category = String(b.category == null ? '' : b.category).trim();
   if (!ids.length && !(b.replace && category)) return res.json({ success: false, message: 'Chưa chọn thủ tục nào.' });
   try {
+    const targetId = category ? await categoryIdByName(category) : 0;
+    if (!isSuperAdmin(req) && (!targetId || !(await permissionFor(req, targetId, 'add')))) return deny(res);
     const n = await assignProcedures(category, ids, !!b.replace);
     res.json({ success: true, message: category ? `Đã chuyển ${n} thủ tục vào “${category}”.` : `Đã chuyển ${n} thủ tục về mục “Chưa phân lĩnh vực”.` });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
@@ -425,7 +541,8 @@ app.get('/api/categories', async (_req, res) => {
 });
 
 // Nhập các lĩnh vực mẫu (chỉ thêm những lĩnh vực chưa có tên trùng)
-app.post('/api/admin/categories/import-defaults', async (_req, res) => {
+app.post('/api/admin/categories/import-defaults', async (req, res) => {
+  if (!isSuperAdmin(req)) return deny(res, 'Chỉ quản trị viên hệ thống mới được nhập danh mục mẫu.');
   const defaults = [['1. LĨNH VỰC QUẢN LÝ CƯ TRÚ', '#c8e6c9'], ['2. LĨNH VỰC ĐĂNG KÝ XE', '#ffccbc'], ['3. LĨNH VỰC CẤP HỘ CHIẾU', '#bbdefb']];
   try {
     const have = new Set((await db.execute(`SELECT name FROM categories`)).rows.map(r => r.name));
@@ -449,6 +566,11 @@ app.post('/api/admin/categories', async (req, res) => {
   const orderNum = Math.max(1, parseInt(sort_order, 10) || 1);
   const parentId = Math.max(0, parseInt(parent_id, 10) || 0);
   try {
+    if (id) {
+      if (!(await permissionFor(req, Number(id), 'edit'))) return deny(res);
+    } else if (parentId) {
+      if (!(await permissionFor(req, parentId, 'add'))) return deny(res);
+    } else if (!isSuperAdmin(req)) return deny(res, 'Chỉ quản trị viên hệ thống mới được tạo lĩnh vực cấp cao nhất.');
     // Chỉ hỗ trợ 2 cấp: Lĩnh vực -> Lĩnh vực con
     if (parentId) {
       if (id && Number(id) === parentId) return res.json({ success: false, message: 'Lĩnh vực không thể là con của chính nó!' });
@@ -497,16 +619,25 @@ app.post('/api/admin/categories', async (req, res) => {
 
 app.delete('/api/admin/categories/:id', async (req, res) => {
   try {
-    const found = await db.execute({ sql: `SELECT name FROM categories WHERE id = ?`, args: [Number(req.params.id)] });
+    const id = Number(req.params.id);
+    const found = await db.execute({ sql: `SELECT id, name, COALESCE(parent_id,0) AS parent_id FROM categories WHERE id = ?`, args: [id] });
     if (!found.rows.length) return res.json({ success: false, message: 'Không tìm thấy lĩnh vực!' });
-    const name = found.rows[0].name;
-    const kids = await db.execute({ sql: `SELECT COUNT(*) AS total FROM categories WHERE parent_id = ?`, args: [Number(req.params.id)] });
-    if (Number(kids.rows[0].total) > 0) return res.json({ success: false, message: 'Lĩnh vực đang có lĩnh vực con. Hãy xóa hoặc chuyển các lĩnh vực con trước.' });
-    const used = await db.execute({ sql: `SELECT COUNT(*) AS total FROM procedures WHERE category = ?`, args: [name] });
-    if (Number(used.rows[0].total) > 0) return res.json({ success: false, message: 'Lĩnh vực đang có thủ tục. Hãy chuyển hoặc xóa các thủ tục trước.' });
-    await db.execute({ sql: `DELETE FROM categories WHERE id = ?`, args: [Number(req.params.id)] });
+    if (!(await permissionFor(req, id, 'delete'))) return deny(res);
+
+    // Cho phép xóa cả mục lớn. Thủ tục được giữ lại an toàn và chuyển về “Chưa phân lĩnh vực”.
+    const children = await db.execute({ sql:`SELECT id, name FROM categories WHERE parent_id=?`, args:[id] });
+    const names = [String(found.rows[0].name), ...children.rows.map(x=>String(x.name))];
+    if (names.length) {
+      await db.execute({ sql:`UPDATE procedures SET category='', agency='', address='', map_url='', phone='' WHERE category IN (${names.map(()=>'?').join(',')})`, args:names });
+    }
+    if (children.rows.length) {
+      await db.execute({ sql:`DELETE FROM user_permissions WHERE category_id IN (${children.rows.map(()=>'?').join(',')})`, args:children.rows.map(x=>Number(x.id)) });
+      await db.execute({ sql:`DELETE FROM categories WHERE parent_id=?`, args:[id] });
+    }
+    await db.execute({ sql:`DELETE FROM user_permissions WHERE category_id=?`, args:[id] });
+    await db.execute({ sql:`DELETE FROM categories WHERE id=?`, args:[id] });
     bust();
-    res.json({ success: true, message: 'Đã xóa lĩnh vực!' });
+    res.json({ success: true, message: children.rows.length ? `Đã xóa mục lớn và ${children.rows.length} mục con. Các thủ tục liên quan đã chuyển về “Chưa phân lĩnh vực”.` : 'Đã xóa lĩnh vực. Các thủ tục liên quan đã chuyển về “Chưa phân lĩnh vực”.' });
   } catch (err) { res.status(500).json({ success: false, message: 'Lỗi khi xóa lĩnh vực: ' + err.message }); }
 });
 
@@ -554,6 +685,15 @@ app.post('/api/admin/procedures', async (req, res) => {
   };
 
   try {
+    const targetCatId = await categoryIdByName(values.category);
+    if (!isSuperAdmin(req)) {
+      if (!targetCatId) return deny(res);
+      if (b.id) {
+        const oldP = await db.execute({sql:`SELECT category FROM procedures WHERE id=?`,args:[Number(b.id)]});
+        const oldCatId = oldP.rows.length ? await categoryIdByName(oldP.rows[0].category) : 0;
+        if (!oldCatId || !(await permissionFor(req, oldCatId, 'edit'))) return deny(res);
+      } else if (!(await permissionFor(req, targetCatId, 'add'))) return deny(res);
+    }
     const catInfo = await db.execute({ sql: `SELECT agency, map_url, phone FROM categories WHERE name = ? LIMIT 1`, args: [values.category] });
     if (catInfo.rows.length) {
       values.agency = catInfo.rows[0].agency || '';
@@ -579,7 +719,9 @@ app.post('/api/admin/procedures', async (req, res) => {
 
 app.delete('/api/admin/procedures/:id', async (req, res) => {
   try {
-    await db.execute({ sql: `DELETE FROM procedures WHERE id = ?`, args: [Number(req.params.id)] });
+    const id=Number(req.params.id);
+    if(!isSuperAdmin(req)){const pr=await db.execute({sql:`SELECT category FROM procedures WHERE id=?`,args:[id]});const cid=pr.rows.length?await categoryIdByName(pr.rows[0].category):0;if(!cid||!(await permissionFor(req,cid,'delete')))return deny(res);}
+    await db.execute({ sql: `DELETE FROM procedures WHERE id = ?`, args: [id] });
     bust();
     res.json({ success: true, message: 'Đã xóa thủ tục thành công!' });
   } catch (err) { res.status(500).json({ success: false, message: 'Lỗi khi xóa thủ tục!' }); }
@@ -589,6 +731,7 @@ app.post('/api/admin/procedures/bulk-delete', async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
   if (!ids.length) return res.json({ success: false, message: 'Chưa chọn thủ tục để xóa.' });
   try {
+    if(!isSuperAdmin(req)){for(const id of ids){const pr=await db.execute({sql:`SELECT category FROM procedures WHERE id=?`,args:[id]});const cid=pr.rows.length?await categoryIdByName(pr.rows[0].category):0;if(!cid||!(await permissionFor(req,cid,'delete')))return deny(res,'Bạn không có quyền xóa một hoặc nhiều thủ tục đã chọn.');}}
     for (const id of ids) await db.execute({ sql: `DELETE FROM procedures WHERE id = ?`, args: [id] });
     bust();
     res.json({ success: true, message: `Đã xóa ${ids.length} thủ tục.` });
@@ -602,6 +745,10 @@ app.post('/api/admin/reorder', async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map(Number).filter(Number.isFinite))] : [];
   if (!table || !ids.length) return res.json({ success: false, message: 'Dữ liệu sắp xếp không hợp lệ!' });
   try {
+    if(!isSuperAdmin(req)){
+      if(table==='categories') return deny(res,'Chỉ quản trị viên hệ thống mới được sắp xếp các mục lớn.');
+      const pr=await db.execute({sql:`SELECT category FROM procedures WHERE id=?`,args:[ids[0]]});const cid=pr.rows.length?await categoryIdByName(pr.rows[0].category):0;if(!cid||!(await permissionFor(req,cid,'edit')))return deny(res);
+    }
     await db.batch(ids.map((id, i) => ({ sql: `UPDATE ${table} SET sort_order = ? WHERE id = ?`, args: [i + 1, id] })), 'write');
     bust();
     res.json({ success: true, message: 'Đã lưu thứ tự mới!' });

@@ -1,7 +1,7 @@
 {
   "name": "ho-tro-thu-tuc-hanh-chinh",
-  "version": "2.4.0",
-  "description": "Phần mềm Hỗ trợ Thủ tục Hành chính - Turso Cloud",
+  "version": "3.1.1",
+  "description": "Phần mềm Hỗ trợ Thủ tục Hành chính - giao diện điều hành, tài khoản và phân quyền",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

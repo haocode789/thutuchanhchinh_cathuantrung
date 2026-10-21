@@ -1,6 +1,6 @@
 {
   "name": "ho-tro-thu-tuc-hanh-chinh",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Phần mềm Hỗ trợ Thủ tục Hành chính - Turso Cloud",
   "main": "server.js",
   "scripts": {

@@ -88,11 +88,11 @@ function bust() { homeCache = null; fullCache.clear(); }
 const SETTINGS_SQL = `SELECT key,
   CASE WHEN value LIKE 'data:%' THEN '/api/media/setting/' || key || '?v=' || length(value) ELSE value END AS value
   FROM settings`;
-const CATEGORIES_SQL = `SELECT id, sort_order, COALESCE(parent_id, 0) AS parent_id, name, background_color, description, agency, map_url, phone,
+const CATEGORIES_SQL = `SELECT id, sort_order, COALESCE(parent_id, 0) AS parent_id, name, background_color, description, agency, address, map_url, phone, COALESCE(active, 1) AS active,
   CASE WHEN background_image LIKE 'data:%' THEN '/api/media/category/' || id || '?v=' || length(background_image) ELSE background_image END AS background_image
   FROM categories ORDER BY sort_order ASC, id ASC`;
 const PROCEDURES_SQL = `SELECT id, sort_order, title, category, video_url, description, agency, address, map_url, phone, createdAt,
-  document_name, common_errors, common_errors_doc_name, steps, contact_info,
+  document_name, common_errors, common_errors_doc_name, steps, contact_info, service_url, COALESCE(tag, '') AS tag,
   CASE WHEN COALESCE(document_url, '') <> '' THEN 1 ELSE 0 END AS has_doc,
   CASE WHEN COALESCE(common_errors_doc_url, '') <> '' THEN 1 ELSE 0 END AS has_err_doc
   FROM procedures ORDER BY sort_order ASC, id ASC`;
@@ -142,6 +142,14 @@ app.get('/api/media/:kind/:key', async (req, res) => {
     res.send(buf);
   } catch (err) { res.status(500).end(); }
 });
+
+// Chuẩn hóa link làm thủ tục: tự thêm https:// nếu thiếu, chỉ chấp nhận http/https
+function normalizeServiceUrl(u) {
+  u = String(u || '').trim();
+  if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch (_) { return ''; }
+}
 
 function formatVideoEmbedUrl(url) {
   if (!url) return '';
@@ -242,11 +250,11 @@ async function initDB() {
       ['document_name', 'TEXT'], ['common_errors', 'TEXT'],
       ['common_errors_doc_url', 'TEXT'], ['common_errors_doc_name', 'TEXT'],
       ['agency', 'TEXT'], ['address', 'TEXT'], ['map_url', 'TEXT'], ['phone', 'TEXT'],
-      ['steps', 'TEXT'], ['contact_info', 'TEXT']
+      ['steps', 'TEXT'], ['contact_info', 'TEXT'], ['service_url', 'TEXT'], ["tag", "TEXT DEFAULT ''"]
     ];
     for (const [name, type] of procedureColumns) await ensureColumn('procedures', name, type);
 
-    const categoryColumns = [['agency','TEXT DEFAULT \'\''], ['map_url','TEXT DEFAULT \'\''], ['phone','TEXT DEFAULT \'\''], ['parent_id','INTEGER DEFAULT 0']];
+    const categoryColumns = [['agency','TEXT DEFAULT \'\''], ['map_url','TEXT DEFAULT \'\''], ['phone','TEXT DEFAULT \'\''], ['parent_id','INTEGER DEFAULT 0'], ['address','TEXT DEFAULT \'\''], ['active','INTEGER DEFAULT 1']];
     for (const [name, type] of categoryColumns) await ensureColumn('categories', name, type);
 
     const defaultSettings = [
@@ -416,8 +424,26 @@ app.get('/api/categories', async (_req, res) => {
   catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// Nhập các lĩnh vực mẫu (chỉ thêm những lĩnh vực chưa có tên trùng)
+app.post('/api/admin/categories/import-defaults', async (_req, res) => {
+  const defaults = [['1. LĨNH VỰC QUẢN LÝ CƯ TRÚ', '#c8e6c9'], ['2. LĨNH VỰC ĐĂNG KÝ XE', '#ffccbc'], ['3. LĨNH VỰC CẤP HỘ CHIẾU', '#bbdefb']];
+  try {
+    const have = new Set((await db.execute(`SELECT name FROM categories`)).rows.map(r => r.name));
+    let next = Number((await db.execute(`SELECT COALESCE(MAX(sort_order), 0) AS m FROM categories WHERE COALESCE(parent_id, 0) = 0`)).rows[0].m) || 0;
+    const stmts = [];
+    for (const [name, color] of defaults) {
+      if (have.has(name)) continue;
+      stmts.push({ sql: `INSERT INTO categories (sort_order, parent_id, name, background_image, background_color, description, agency, address, active, map_url, phone) VALUES (?, 0, ?, '', ?, '', '', '', 1, '', '')`, args: [++next, name, color] });
+    }
+    if (stmts.length) await db.batch(stmts, 'write');
+    bust();
+    res.json({ success: true, message: stmts.length ? `Đã nhập ${stmts.length} lĩnh vực mẫu.` : 'Các lĩnh vực mẫu đã có sẵn, không cần nhập thêm.' });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 app.post('/api/admin/categories', async (req, res) => {
-  const { id, sort_order, name, background_image, background_color, description, agency, map_url, phone, parent_id, procedure_ids } = req.body || {};
+  const { id, sort_order, name, background_image, background_color, description, agency, address, active, map_url, phone, parent_id, procedure_ids } = req.body || {};
+  const activeVal = (active === 0 || active === '0' || active === false) ? 0 : 1;
   const cleanName = String(name || '').trim();
   if (!cleanName) return res.json({ success: false, message: 'Vui lòng nhập tên lĩnh vực!' });
   const orderNum = Math.max(1, parseInt(sort_order, 10) || 1);
@@ -440,8 +466,8 @@ app.post('/api/admin/categories', async (req, res) => {
       const previousName = oldResult.rows[0].name;
       const keepBg = String(background_image || '').startsWith('/api/media/category/');
       await db.execute({
-        sql: `UPDATE categories SET sort_order = ?, parent_id = ?, name = ?, ${keepBg ? '' : 'background_image = ?, '}background_color = ?, description = ?, agency = ?, map_url = ?, phone = ? WHERE id = ?`,
-        args: [orderNum, parentId, cleanName, ...(keepBg ? [] : [background_image || '']), background_color || '#ffffff', description || '', agency || '', map_url || '', phone || '', Number(id)]
+        sql: `UPDATE categories SET sort_order = ?, parent_id = ?, name = ?, ${keepBg ? '' : 'background_image = ?, '}background_color = ?, description = ?, agency = ?, address = ?, active = ?, map_url = ?, phone = ? WHERE id = ?`,
+        args: [orderNum, parentId, cleanName, ...(keepBg ? [] : [background_image || '']), background_color || '#ffffff', description || '', agency || '', String(address || '').trim(), activeVal, map_url || '', phone || '', Number(id)]
       });
       if (previousName !== cleanName) {
         await db.execute({ sql: `UPDATE procedures SET category = ? WHERE category = ?`, args: [cleanName, previousName] });
@@ -456,8 +482,8 @@ app.post('/api/admin/categories', async (req, res) => {
       return res.json({ success: true, id: Number(id), message: 'Cập nhật lĩnh vực thành công!' + (assigned === null ? '' : ` Có ${assigned} thủ tục thuộc lĩnh vực này.`) });
     }
     const ins = await db.execute({
-      sql: `INSERT INTO categories (sort_order, parent_id, name, background_image, background_color, description, agency, map_url, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [orderNum, parentId, cleanName, background_image || '', background_color || '#ffffff', description || '', agency || '', map_url || '', phone || '']
+      sql: `INSERT INTO categories (sort_order, parent_id, name, background_image, background_color, description, agency, address, active, map_url, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [orderNum, parentId, cleanName, background_image || '', background_color || '#ffffff', description || '', agency || '', String(address || '').trim(), activeVal, map_url || '', phone || '']
     });
     let assigned = null;
     if (Array.isArray(procedure_ids) && procedure_ids.length) assigned = await assignProcedures(cleanName, procedure_ids, true);
@@ -522,6 +548,8 @@ app.post('/api/admin/procedures', async (req, res) => {
     common_errors_doc_name: b.common_errors_doc_name || '',
     steps: b.steps || '',
     contact_info: b.contact_info || '',
+    service_url: normalizeServiceUrl(b.service_url),
+    tag: ['popular', 'new'].includes(b.tag) ? b.tag : '',
     agency: '', address: '', map_url: '', phone: ''
   };
 
@@ -534,15 +562,15 @@ app.post('/api/admin/procedures', async (req, res) => {
     }
     if (b.id) {
       await db.execute({
-        sql: `UPDATE procedures SET sort_order=?, title=?, category=?, video_url=?, image_url=?, description=?, document_url=?, document_name=?, common_errors=?, common_errors_doc_url=?, common_errors_doc_name=?, steps=?, contact_info=?, agency=?, address=?, map_url=?, phone=? WHERE id=?`,
-        args: [values.sort_order, values.title, values.category, values.video_url, values.image_url, values.description, values.document_url, values.document_name, values.common_errors, values.common_errors_doc_url, values.common_errors_doc_name, values.steps, values.contact_info, values.agency, values.address, values.map_url, values.phone, Number(b.id)]
+        sql: `UPDATE procedures SET sort_order=?, title=?, category=?, video_url=?, image_url=?, description=?, document_url=?, document_name=?, common_errors=?, common_errors_doc_url=?, common_errors_doc_name=?, steps=?, contact_info=?, service_url=?, tag=?, agency=?, address=?, map_url=?, phone=? WHERE id=?`,
+        args: [values.sort_order, values.title, values.category, values.video_url, values.image_url, values.description, values.document_url, values.document_name, values.common_errors, values.common_errors_doc_url, values.common_errors_doc_name, values.steps, values.contact_info, values.service_url, values.tag, values.agency, values.address, values.map_url, values.phone, Number(b.id)]
       });
       bust();
       return res.json({ success: true, message: 'Cập nhật thủ tục thành công!' });
     }
     await db.execute({
-      sql: `INSERT INTO procedures (sort_order,title,category,video_url,image_url,description,document_url,document_name,common_errors,common_errors_doc_url,common_errors_doc_name,steps,contact_info,agency,address,map_url,phone,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      args: [values.sort_order, values.title, values.category, values.video_url, values.image_url, values.description, values.document_url, values.document_name, values.common_errors, values.common_errors_doc_url, values.common_errors_doc_name, values.steps, values.contact_info, values.agency, values.address, values.map_url, values.phone, new Date().toISOString()]
+      sql: `INSERT INTO procedures (sort_order,title,category,video_url,image_url,description,document_url,document_name,common_errors,common_errors_doc_url,common_errors_doc_name,steps,contact_info,service_url,tag,agency,address,map_url,phone,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      args: [values.sort_order, values.title, values.category, values.video_url, values.image_url, values.description, values.document_url, values.document_name, values.common_errors, values.common_errors_doc_url, values.common_errors_doc_name, values.steps, values.contact_info, values.service_url, values.tag, values.agency, values.address, values.map_url, values.phone, new Date().toISOString()]
     });
     bust();
     res.json({ success: true, message: 'Thêm thủ tục mới thành công!' });

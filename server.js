@@ -37,6 +37,25 @@ const db = createClient({
    - Token không cần lưu ở máy chủ nên chạy tốt trên Vercel (serverless). Nên đặt biến môi trường AUTH_SECRET (chuỗi dài, ngẫu nhiên). */
 const AUTH_SECRET = process.env.AUTH_SECRET || crypto.createHash('sha256').update('tthc|' + (process.env.TURSO_AUTH_TOKEN || 'dev')).digest('hex');
 const TOKEN_TTL = 12 * 60 * 60 * 1000;
+const CHILD_PASSWORD_KEY = crypto.createHash('sha256').update(AUTH_SECRET + '|child-passwords').digest();
+function encryptChildPassword(plain) {
+  plain = String(plain || '');
+  if (!plain) return '';
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', CHILD_PASSWORD_KEY, iv);
+  const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return ['v1', iv.toString('base64url'), tag.toString('base64url'), enc.toString('base64url')].join('.');
+}
+function decryptChildPassword(value) {
+  try {
+    const [v, iv, tag, enc] = String(value || '').split('.');
+    if (v !== 'v1' || !iv || !tag || !enc) return '';
+    const decipher = crypto.createDecipheriv('aes-256-gcm', CHILD_PASSWORD_KEY, Buffer.from(iv, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+    return Buffer.concat([decipher.update(Buffer.from(enc, 'base64url')), decipher.final()]).toString('utf8');
+  } catch (_) { return ''; }
+}
 function signToken(username) {
   const body = Buffer.from(JSON.stringify({ u: username, exp: Date.now() + TOKEN_TTL })).toString('base64url');
   const sig = crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
@@ -202,7 +221,7 @@ async function initDB() {
       ['email', "TEXT DEFAULT ''"], ['phone', "TEXT DEFAULT ''"],
       ['status', "TEXT DEFAULT 'active'"], ['created_by', "TEXT DEFAULT ''"],
       ['created_at', "TEXT DEFAULT ''"], ['must_change_password', 'INTEGER DEFAULT 1'],
-      ['is_superadmin', 'INTEGER DEFAULT 0']
+      ['is_superadmin', 'INTEGER DEFAULT 0'], ['password_enc', "TEXT DEFAULT ''"]
     ]) await ensureColumn('users', name, type);
     await db.execute(`CREATE TABLE IF NOT EXISTS user_permissions (
       username TEXT NOT NULL,
@@ -457,7 +476,9 @@ app.post('/api/admin/change-password', async (req, res) => {
     if (String(newPassword).length < 6) return res.json({ success: false, message: 'Mật khẩu mới phải từ 6 ký tự trở lên!' });
     const check = await db.execute({ sql: `SELECT password FROM users WHERE username = ?`, args: [username] });
     if (!check.rows.length || !(await checkPassword(oldPassword, check.rows[0].password))) return res.json({ success: false, message: 'Mật khẩu cũ không đúng!' });
-    await db.execute({ sql: `UPDATE users SET password = ? WHERE username = ?`, args: [await bcrypt.hash(String(newPassword), 10), username] });
+    const me = await db.execute({ sql:`SELECT COALESCE(is_superadmin,0) AS is_superadmin FROM users WHERE username=?`, args:[username] });
+    const encCopy = me.rows.length && Number(me.rows[0].is_superadmin) === 0 ? encryptChildPassword(String(newPassword)) : '';
+    await db.execute({ sql: `UPDATE users SET password = ?, password_enc = ? WHERE username = ?`, args: [await bcrypt.hash(String(newPassword), 10), encCopy, username] });
     res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -482,11 +503,11 @@ app.post('/api/admin/users', async (req, res) => {
     if(exists.rows.length){
       if(Number(exists.rows[0].is_superadmin)===1 && username!==req.adminUser.username) return deny(res,'Không thể sửa quản trị viên hệ thống khác.');
       await db.execute({sql:`UPDATE users SET name=?, email=?, phone=?, status=? WHERE username=?`,args:[name,String(b.email||'').trim(),String(b.phone||'').trim(),status,username]});
-      if(String(b.password||'').length){ if(String(b.password).length<6)return res.json({success:false,message:'Mật khẩu phải từ 6 ký tự.'}); await db.execute({sql:`UPDATE users SET password=?, must_change_password=1 WHERE username=?`,args:[await bcrypt.hash(String(b.password),10),username]}); }
+      if(String(b.password||'').length){ if(String(b.password).length<6)return res.json({success:false,message:'Mật khẩu phải từ 6 ký tự.'}); await db.execute({sql:`UPDATE users SET password=?, password_enc=?, must_change_password=1 WHERE username=?`,args:[await bcrypt.hash(String(b.password),10),encryptChildPassword(String(b.password)),username]}); }
       return res.json({success:true,message:'Đã cập nhật tài khoản.'});
     }
     if(String(b.password||'').length<6) return res.json({success:false,message:'Mật khẩu ban đầu phải từ 6 ký tự.'});
-    await db.execute({sql:`INSERT INTO users (username,password,role,name,email,phone,status,created_by,created_at,must_change_password,is_superadmin) VALUES (?,?,?,?,?,?,?,?,?,1,0)`,args:[username,await bcrypt.hash(String(b.password),10),'staff',name,String(b.email||'').trim(),String(b.phone||'').trim(),status,req.adminUser.username,new Date().toISOString()]});
+    await db.execute({sql:`INSERT INTO users (username,password,password_enc,role,name,email,phone,status,created_by,created_at,must_change_password,is_superadmin) VALUES (?,?,?,?,?,?,?,?,?,?,1,0)`,args:[username,await bcrypt.hash(String(b.password),10),encryptChildPassword(String(b.password)),'staff',name,String(b.email||'').trim(),String(b.phone||'').trim(),status,req.adminUser.username,new Date().toISOString()]});
     res.json({success:true,message:'Đã tạo tài khoản con.'});
   } catch(err){ const msg=/unique/i.test(String(err.message))?'Tên đăng nhập đã tồn tại.':err.message; res.status(500).json({success:false,message:msg}); }
 });
@@ -501,6 +522,20 @@ app.delete('/api/admin/users/:username', async (req,res)=>{
     if(Number(r.rows[0].is_superadmin)===1)return deny(res,'Không thể xóa quản trị viên hệ thống.');
     await db.batch([{sql:`DELETE FROM user_permissions WHERE username=?`,args:[username]},{sql:`DELETE FROM users WHERE username=?`,args:[username]}],'write');
     res.json({success:true,message:'Đã xóa tài khoản.'});
+  }catch(err){res.status(500).json({success:false,message:err.message});}
+});
+
+app.get('/api/admin/users/:username/password', async (req,res)=>{
+  if(!isSuperAdmin(req)) return deny(res,'Chỉ quản trị viên hệ thống mới được xem mật khẩu tài khoản con.');
+  const username=String(req.params.username||'').trim();
+  try{
+    const r=await db.execute({sql:`SELECT COALESCE(is_superadmin,0) AS is_superadmin, COALESCE(password_enc,'') AS password_enc FROM users WHERE username=?`,args:[username]});
+    if(!r.rows.length) return res.json({success:false,message:'Không tìm thấy tài khoản.'});
+    if(Number(r.rows[0].is_superadmin)===1) return deny(res,'Không hiển thị mật khẩu quản trị viên hệ thống.');
+    const plain=decryptChildPassword(r.rows[0].password_enc);
+    if(!plain) return res.json({success:false,message:'Tài khoản này được tạo từ phiên bản cũ nên chưa có bản mật khẩu có thể xem. Hãy đặt lại mật khẩu một lần rồi xem lại.'});
+    res.set('Cache-Control','no-store');
+    res.json({success:true,password:plain});
   }catch(err){res.status(500).json({success:false,message:err.message});}
 });
 

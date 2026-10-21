@@ -1,11 +1,20 @@
-THUẬN TRUNG v3.2.0
+THUẬN TRUNG v3.3.0
 
-Bản chỉnh sửa theo giao diện mẫu người dùng cung cấp:
-- Giao diện trang chủ FULL SCREEN: bỏ giới hạn chiều rộng 1400px, dùng toàn bộ màn hình.
-- Sidebar, hero, thống kê và thẻ lĩnh vực được cân lại để giống bố cục ảnh mẫu.
-- Bảng quản trị gần toàn màn hình, thanh tiêu đề xanh, thanh tìm kiếm/tạo mới/đồng bộ/lịch sử, tab và 2 khung quản lý theo ảnh mẫu.
-- Tài khoản & Phân quyền giữ bố cục 3 cột và quyền theo từng lĩnh vực.
-- Admin có thể xóa cả mục lớn; mục con bị xóa cùng, thủ tục không mất mà chuyển về “Chưa phân lĩnh vực”.
-- Có Lịch sử thay đổi quản trị (audit log) mới.
-- Dòng “Hệ thống phần mềm © Công an xã Thuần Trung” là cố định, không cho sửa.
-- Cấu trúc Vercel đầy đủ: server.js, package.json, vercel.json, public/index.html, public/watch.html.
+Các thay đổi chính:
+- Bỏ 4 thẻ số liệu trên trang chủ.
+- Bỏ dải nút lọc nhanh lĩnh vực bên dưới tiêu đề danh mục.
+- Bỏ mục Cài đặt và Trợ giúp khỏi nhóm Tiện ích khác trên thanh bên.
+- Thêm thanh điều hướng Quay lại / Trang chính ngay trên giao diện.
+- Quản trị viên hệ thống có thể xem lại mật khẩu tài khoản con được tạo/đặt lại từ phiên bản 3.3.0.
+- Mật khẩu đăng nhập vẫn được lưu dạng bcrypt; bản dùng để xem lại được mã hóa AES-256-GCM bằng khóa dẫn xuất từ AUTH_SECRET.
+- Tài khoản con tạo từ phiên bản cũ không thể khôi phục mật khẩu cũ do bcrypt một chiều; cần đặt lại mật khẩu một lần.
+- Giữ các tính năng quản trị lĩnh vực, thủ tục, chọn thủ tục có sẵn, xóa mục lớn, phân quyền và lịch sử thay đổi.
+
+Triển khai Vercel:
+- server.js
+- package.json
+- vercel.json
+- public/index.html
+- public/watch.html
+
+Khuyến nghị: cấu hình AUTH_SECRET dài và ổn định trên Vercel. Nếu đổi AUTH_SECRET, các mật khẩu con đã lưu để xem lại trước đó sẽ không giải mã được.

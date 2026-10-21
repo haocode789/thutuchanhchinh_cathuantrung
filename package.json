@@ -1,7 +1,7 @@
 {
   "name": "ho-tro-thu-tuc-hanh-chinh",
-  "version": "3.2.0",
-  "description": "Phần mềm Hỗ trợ Thủ tục Hành chính - giao diện điều hành, tài khoản và phân quyền",
+  "version": "3.3.0",
+  "description": "Phần mềm Hỗ trợ Thủ tục Hành chính - giao diện full màn hình, quản trị tài khoản và phân quyền",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
